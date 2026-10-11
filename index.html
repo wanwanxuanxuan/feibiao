@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>校园任务工作台 · StudyHub</title>
+<title>智学云 · 校园管理任务工作台</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -91,6 +91,24 @@
   .search-box:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px var(--ring)}
   .search-box input{border:none;background:transparent;outline:none;font-size:13px;color:var(--text);width:100%}
   .search-box svg{color:var(--muted);flex-shrink:0}
+
+  /* Role switch */
+  .role-switch{
+    display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);
+    border-radius:10px;padding:6px 10px;transition:border-color .18s;
+  }
+  .role-switch:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px var(--ring)}
+  .role-ic{font-size:16px}
+  .role-select{
+    border:none;background:transparent;outline:none;font-size:13px;font-weight:600;color:var(--text);
+    font-family:inherit;cursor:pointer;
+  }
+  .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;box-shadow:0 0 0 2px rgba(16,185,129,.25);animation:beat 2s infinite}
+  .sync-dot.syncing{background:var(--warn);box-shadow:0 0 0 2px rgba(245,158,11,.25);animation:spin 1s linear infinite}
+  @keyframes beat{0%,100%{transform:scale(1)}50%{transform:scale(1.3)}}
+  @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+  .line{text-decoration:line-through;color:var(--muted)}
 
   .content{padding:24px;flex:1;max-width:1400px;width:100%;margin:0 auto}
   .view{display:none;animation:fadeIn .35s ease}
@@ -286,14 +304,16 @@
     <div class="brand">
       <div class="brand-mark">🎓</div>
       <div>
-        <div class="brand-name">StudyHub</div>
-        <div class="brand-sub">校园任务工作台</div>
+        <div class="brand-name">智学云</div>
+        <div class="brand-sub">校园管理任务工作台</div>
       </div>
     </div>
     <nav class="nav" id="nav">
       <div class="nav-item active" data-view="dashboard"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>仪表盘</div>
       <div class="nav-item" data-view="tasks"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>任务<span class="nav-badge" id="taskCount">0</span></div>
       <div class="nav-item" data-view="schedule"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>课程表</div>
+      <div class="nav-item" data-view="homework"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>作业<span class="nav-badge" id="hwCount">0</span></div>
+      <div class="nav-item" data-view="notices"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>家校通知<span class="nav-badge" id="noticeCount">0</span></div>
       <div class="nav-item" data-view="calendar"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>日历</div>
       <div class="nav-item" data-view="grades"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>成绩</div>
       <div class="nav-item" data-view="pomodoro"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>番茄钟</div>
@@ -308,7 +328,7 @@
         <button class="icon-btn" id="importBtn" title="导入数据"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg></button>
         <input type="file" id="importFile" accept=".json" style="display:none">
       </div>
-      <div class="tiny">数据本地存储 · v1.0</div>
+      <div class="tiny">三端数据实时同步 · v2.0</div>
     </div>
   </aside>
 
@@ -318,6 +338,15 @@
       <button class="icon-btn menu-btn" id="menuBtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
       <div class="greeting" id="greeting">你好，同学<small id="greetingSub"></small></div>
       <div class="top-actions">
+        <div class="role-switch" id="roleSwitch" title="切换角色">
+          <span class="role-ic" id="roleIcon">👨‍🏫</span>
+          <select id="roleSelect" class="role-select">
+            <option value="teacher">老师端</option>
+            <option value="student">学生端</option>
+            <option value="parent">家长端</option>
+          </select>
+          <span class="sync-dot" id="syncDot" title="同步状态"></span>
+        </div>
         <div class="search-box">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
           <input id="globalSearch" placeholder="搜索任务、笔记...">
@@ -382,6 +411,17 @@
             <div id="dashCountdown"></div>
           </div>
         </div>
+
+        <div class="grid grid-2" style="margin-top:16px">
+          <div class="card card-pad">
+            <div class="card-title"><span class="dot" style="background:var(--accent)"></span>待完成作业</div>
+            <div id="dashHomework"></div>
+          </div>
+          <div class="card card-pad">
+            <div class="card-title"><span class="dot" style="background:var(--primary)"></span>最新通知</div>
+            <div id="dashNotices"></div>
+          </div>
+        </div>
       </section>
 
       <!-- Tasks -->
@@ -421,6 +461,33 @@
           <div class="sched-grid" id="schedGrid"></div>
           <div style="margin-top:12px;font-size:12px;color:var(--muted)">提示：点击课程可编辑或删除。当前周会高亮显示。</div>
         </div>
+      </section>
+
+      <!-- Homework -->
+      <section class="view" id="view-homework">
+        <div class="card card-pad" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="card-title" style="margin:0"><span class="dot" style="background:var(--accent)"></span>作业管理</div>
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select class="select" id="hwSubjectFilter" style="width:auto"><option value="">全部科目</option></select>
+            <select class="select" id="hwStatusFilter" style="width:auto">
+              <option value="">全部状态</option>
+              <option value="pending">未完成</option>
+              <option value="done">已完成</option>
+              <option value="overdue">已逾期</option>
+            </select>
+            <button class="btn btn-primary btn-sm" id="hwAddBtn" onclick="homework.openModal()">+ 布置作业</button>
+          </div>
+        </div>
+        <div id="hwList"></div>
+      </section>
+
+      <!-- Notices -->
+      <section class="view" id="view-notices">
+        <div class="card card-pad" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="card-title" style="margin:0"><span class="dot" style="background:var(--info)"></span>家校通知</div>
+          <button class="btn btn-primary btn-sm" id="noticeAddBtn" style="margin-left:auto" onclick="notices.openModal()">+ 发布通知</button>
+        </div>
+        <div id="noticeList"></div>
       </section>
 
       <!-- Calendar -->
@@ -569,17 +636,76 @@
 const DB = {
   get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
   set(k,v){localStorage.setItem(k,JSON.stringify(v))},
-  key:'studyhub_v1'
+  key:'studyhub_v1',
+  roleKey:'studyhub_role'
 };
 let store = DB.get(DB.key, {
-  tasks:[], schedule:[], grades:[], notes:[], countdowns:[], pomoLog:[], theme:'light'
+  tasks:[], schedule:[], grades:[], notes:[], countdowns:[], pomoLog:[], theme:'light',
+  homework:[], notices:[]
 });
-function save(){DB.set(DB.key,store)}
+function save(){DB.set(DB.key,store);broadcastSync()}
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const todayStr=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 const fmtDate=(s)=>{if(!s)return '';const d=new Date(s);return `${d.getMonth()+1}月${d.getDate()}日`};
 const fmtDateTime=(s)=>{const d=new Date(s);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
+
+/* ============ Role & Sync ============ */
+let currentRole = DB.get(DB.roleKey, 'teacher');
+const ROLE_META = {
+  teacher:{name:'老师',icon:'👨‍🏫',greet:'老师'},
+  student:{name:'学生',icon:'🧑‍🎓',greet:'同学'},
+  parent:{name:'家长',icon:'👨‍👩‍👧',greet:'家长'}
+};
+function setRole(r){
+  currentRole=r;DB.set(DB.roleKey,r);
+  document.getElementById('roleSelect').value=r;
+  document.getElementById('roleIcon').textContent=ROLE_META[r].icon;
+  applyRoleUI();updateGreeting();renderAll();
+  toast(`已切换到${ROLE_META[r].name}端`);
+}
+function applyRoleUI(){
+  // teachers can manage schedule, homework, grades, notices
+  const isTeacher = currentRole==='teacher';
+  // homework add button
+  const hwAdd=document.getElementById('hwAddBtn');if(hwAdd)hwAdd.style.display=isTeacher?'':'none';
+  const noticeAdd=document.getElementById('noticeAddBtn');if(noticeAdd)noticeAdd.style.display=isTeacher?'':'none';
+  // schedule add button
+  const schedAdd=document.querySelector('#view-schedule .btn-primary');if(schedAdd)schedAdd.style.display=isTeacher?'':'none';
+  // grades add button
+  const gradeAdd=document.querySelector('#view-grades .btn-primary');if(gradeAdd)gradeAdd.style.display=isTeacher?'':'none';
+}
+function renderAll(){
+  tasks.render();schedule.render();calendar.render();grades.render();
+  notes.render();countdown.render();dashboard.render();
+  homework.render();notices.render();
+}
+
+/* Real-time sync across tabs */
+let bc=null;
+try{bc=new BroadcastChannel('studyhub_sync')}catch(e){bc=null}
+function broadcastSync(){
+  try{if(bc)bc.postMessage({type:'sync',ts:Date.now()})}catch(e){}
+}
+if(bc){
+  bc.onmessage=(e)=>{
+    if(e.data&&e.data.type==='sync'){
+      const fresh=DB.get(DB.key,null);
+      if(fresh){store=fresh;renderAll()}
+    }
+  };
+}
+window.addEventListener('storage',(e)=>{
+  if(e.key===DB.key){
+    const fresh=DB.get(DB.key,null);
+    if(fresh){store=fresh;renderAll();toast('数据已同步')}
+  }
+});
+function pulseSync(){
+  const dot=document.getElementById('syncDot');
+  dot.classList.add('syncing');
+  setTimeout(()=>dot.classList.remove('syncing'),600);
+}
 
 /* ============ Navigation ============ */
 document.getElementById('nav').addEventListener('click',e=>{
@@ -602,9 +728,13 @@ function updateGreeting(){
   let g='你好';
   if(h<6)g='夜深了';else if(h<11)g='早上好';else if(h<14)g='中午好';else if(h<18)g='下午好';else g='晚上好';
   const d=new Date();const w=['日','一','二','三','四','五','六'];
-  document.getElementById('greeting').innerHTML=`${g}，同学<small>${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 · 星期${w[d.getDay()]}</small>`;
+  const greet=ROLE_META[currentRole].greet;
+  document.getElementById('greeting').innerHTML=`${g}，${greet}<small>${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 · 星期${w[d.getDay()]}</small>`;
 }
 updateGreeting();
+
+/* Role select */
+document.getElementById('roleSelect').addEventListener('change',e=>setRole(e.target.value));
 
 /* Theme */
 function applyTheme(){
@@ -616,7 +746,7 @@ document.getElementById('themeBtn').onclick=()=>{store.theme=store.theme==='dark
 /* Export / Import */
 document.getElementById('exportBtn').onclick=()=>{
   const blob=new Blob([JSON.stringify(store,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`studyhub-${todayStr()}.json`;a.click();
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`zhixueyun-${todayStr()}.json`;a.click();
   toast('数据已导出');
 };
 document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
@@ -743,6 +873,7 @@ const schedule={
   weekOffset:0,
   render(){
     const colors=['#6d5efc','#f59e0b','#10b981','#ef4444','#06b6d4','#8b5cf6','#ec4899','#14b8a6'];
+    const colorFor=(name)=>{let h=0;for(let i=0;i<name.length;i++)h=name.charCodeAt(i)+((h<<5)-h);return colors[Math.abs(h)%colors.length]};
     const days=['日','一','二','三','四','五','六'];
     const start=new Date();start.setDate(start.getDate()-start.getDay()+this.weekOffset*7);
     const end=new Date(start);end.setDate(end.getDate()+6);
@@ -767,11 +898,13 @@ const schedule={
         const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
         const c=store.schedule.find(x=>x.day===di&&x.period===p.n);
         if(c){
-          const col=colors[store.schedule.indexOf(c)%colors.length];
-          html+=`<div class="sched-cell" onclick="schedule.openModal('${c.id}')"><div class="course-chip" style="background:${col}">
+          const col=colorFor(c.name);
+          const clickable=currentRole==='teacher'?`onclick="schedule.openModal('${c.id}')"`:'';
+          html+=`<div class="sched-cell" ${clickable}><div class="course-chip" style="background:${col}">
             <div>${c.name}</div><div class="loc">📍${c.location||''}</div></div></div>`;
         }else{
-          html+=`<div class="sched-cell" onclick="schedule.openModal('','${ds}',${p.n},${di})"></div>`;
+          const clickable=currentRole==='teacher'?`onclick="schedule.openModal('','${ds}',${p.n},${di})"`:'';
+          html+=`<div class="sched-cell" ${clickable}></div>`;
         }
       }
     });
@@ -780,6 +913,7 @@ const schedule={
   prevWeek(){this.weekOffset--;this.render()},
   nextWeek(){this.weekOffset++;this.render()},
   openModal(id,date,period,day){
+    if(currentRole!=='teacher'){toast('仅老师可编辑课程表');return}
     const c=id?store.schedule.find(x=>x.id===id):{name:'',teacher:'',location:'',day:day||0,period:period||1};
     openModal(id?'编辑课程':'添加课程',`
       <div style="display:grid;gap:12px">
@@ -815,6 +949,151 @@ const schedule={
     save();closeModal();schedule.render();dashboard.render();toast(id?'已更新':'已添加');
   },
   del(id){store.schedule=store.schedule.filter(x=>x.id!==id);save();closeModal();schedule.render();dashboard.render();toast('已删除')}
+};
+
+/* ============ Homework Module ============ */
+const homework={
+  subject:'',status:'',
+  render(){
+    const list=[...store.homework].sort((a,b)=>(b.due||'').localeCompare(a.due||''));
+    // subject filter options
+    const subs={};store.homework.forEach(h=>subs[h.subject]=(subs[h.subject]||0)+1);
+    const subSel=document.getElementById('hwSubjectFilter');
+    if(subSel)subSel.innerHTML='<option value="">全部科目</option>'+Object.keys(subs).map(s=>`<option value="${s}" ${this.subject===s?'selected':''}>${s}</option>`).join('');
+    // count pending for badge
+    const pending=store.homework.filter(h=>!h.done&&(h.due>=todayStr()||!h.due)).length;
+    const bc=document.getElementById('hwCount');if(bc)bc.textContent=pending;
+    // filter
+    let filtered=list.filter(h=>{
+      if(this.subject&&h.subject!==this.subject)return false;
+      if(this.status==='pending'&&h.done)return false;
+      if(this.status==='done'&&!h.done)return false;
+      if(this.status==='overdue'&&(h.done||!h.due||h.due>=todayStr()))return false;
+      return true;
+    });
+    const el=document.getElementById('hwList');
+    if(filtered.length===0){el.innerHTML='<div class="card card-pad empty"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg><div>暂无作业</div></div>';return}
+    el.innerHTML=filtered.map(h=>{
+      const overdue=!h.done&&h.due&&h.due<todayStr();
+      const canEdit=currentRole==='teacher';
+      const canToggle=currentRole==='student'||currentRole==='teacher';
+      return `<div class="task-item ${h.done?'done':''}">
+        <div class="check ${h.done?'checked':''}" ${canToggle?`onclick="homework.toggle('${h.id}')"`:''}>${h.done?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>':''}</div>
+        <div class="task-body">
+          <div class="task-title">${h.title}</div>
+          <div class="task-meta">
+            <span class="tag tag-cat">${h.subject||'未分类'}</span>
+            ${h.due?`<span>📅 截止 ${fmtDate(h.due)}${overdue?' <span style="color:var(--danger)">已逾期</span>':''}</span>`:''}
+            <span>👨‍🏫 ${h.teacher||'—'}</span>
+          </div>
+          ${h.desc?`<div style="font-size:12px;color:var(--muted);margin-top:4px">${h.desc}</div>`:''}
+        </div>
+        <div class="task-actions">
+          ${canEdit?`<button onclick="homework.openModal('${h.id}')" title="编辑"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button onclick="homework.del('${h.id}')" title="删除"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>`:''}
+        </div>
+      </div>`;
+    }).join('');
+  },
+  openModal(id){
+    if(currentRole!=='teacher'){toast('仅老师可布置作业');return}
+    const h=id?store.homework.find(x=>x.id===id):{title:'',desc:'',subject:'',due:'',teacher:''};
+    openModal(id?'编辑作业':'布置作业',`
+      <div style="display:grid;gap:12px">
+        <div><label class="lbl">作业标题</label><input class="input" id="h_title" value="${h.title||''}" placeholder="如：第三章习题 1-15"></div>
+        <div><label class="lbl">科目</label><input class="input" id="h_subject" value="${h.subject||''}" placeholder="如：高等数学"></div>
+        <div><label class="lbl">描述</label><textarea class="textarea" id="h_desc">${h.desc||''}</textarea></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div><label class="lbl">截止日期</label><input type="date" class="input" id="h_due" value="${h.due||''}"></div>
+          <div><label class="lbl">授课教师</label><input class="input" id="h_teacher" value="${h.teacher||''}" placeholder="如：王教授"></div>
+        </div>
+      </div>`,
+      `<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="homework.save('${id||''}')">保存</button>`);
+  },
+  save(id){
+    const data={
+      title:document.getElementById('h_title').value.trim(),
+      subject:document.getElementById('h_subject').value.trim(),
+      desc:document.getElementById('h_desc').value.trim(),
+      due:document.getElementById('h_due').value,
+      teacher:document.getElementById('h_teacher').value.trim()
+    };
+    if(!data.title){toast('请填写作业标题');return}
+    if(id){Object.assign(store.homework.find(x=>x.id===id),data)}
+    else{store.homework.push({id:uid(),...data,done:false,createdAt:Date.now()})}
+    save();closeModal();homework.render();dashboard.render();toast(id?'已更新':'已布置');
+  },
+  toggle(id){const h=store.homework.find(x=>x.id===id);h.done=!h.done;save();homework.render();dashboard.render();toast(h.done?'已完成':'已取消完成')},
+  del(id){if(confirm('确定删除此作业？')){store.homework=store.homework.filter(x=>x.id!==id);save();homework.render();dashboard.render();toast('已删除')}}
+};
+document.getElementById('hwSubjectFilter').addEventListener('change',e=>{homework.subject=e.target.value;homework.render()});
+document.getElementById('hwStatusFilter').addEventListener('change',e=>{homework.status=e.target.value;homework.render()});
+
+/* ============ Notices Module ============ */
+const notices={
+  render(){
+    const list=[...store.notices].sort((a,b)=>b.createdAt-a.createdAt);
+    const unread=store.notices.filter(n=>!n.read).length;
+    const bc=document.getElementById('noticeCount');if(bc)bc.textContent=unread;
+    const el=document.getElementById('noticeList');
+    if(list.length===0){el.innerHTML='<div class="card card-pad empty"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg><div>暂无通知</div></div>';return}
+    const types={info:['通知','var(--info)'],warning:['提醒','var(--warn)'],urgent:['紧急','var(--danger)']};
+    el.innerHTML=list.map(n=>{
+      const t=types[n.type]||types.info;
+      const canEdit=currentRole==='teacher';
+      return `<div class="task-item" style="${n.read?'':'border-left:3px solid var(--primary)'}">
+        <div class="task-body">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="tag" style="background:color-mix(in srgb,${t[1]} 15%,transparent);color:${t[1]}">${t[0]}</span>
+            <div class="task-title">${n.title}</div>
+            ${!n.read?'<span class="tag tag-high">新</span>':''}
+          </div>
+          <div class="task-meta">
+            <span>👨‍🏫 ${n.from||'学校'}</span>
+            <span>🕒 ${fmtDateTime(n.createdAt)}</span>
+          </div>
+          ${n.content?`<div style="font-size:13px;margin-top:6px;line-height:1.6">${n.content.replace(/\n/g,'<br>')}</div>`:''}
+        </div>
+        <div class="task-actions">
+          ${!n.read?`<button onclick="notices.markRead('${n.id}')" title="标记已读"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></button>`:''}
+          ${canEdit?`<button onclick="notices.openModal('${n.id}')" title="编辑"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button onclick="notices.del('${n.id}')" title="删除"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>`:''}
+        </div>
+      </div>`;
+    }).join('');
+  },
+  openModal(id){
+    if(currentRole!=='teacher'){toast('仅老师可发布通知');return}
+    const n=id?store.notices.find(x=>x.id===id):{title:'',content:'',from:'',type:'info'};
+    openModal(id?'编辑通知':'发布通知',`
+      <div style="display:grid;gap:12px">
+        <div><label class="lbl">通知标题</label><input class="input" id="n_title" value="${n.title||''}"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div><label class="lbl">类型</label><select class="select" id="n_type">
+            <option value="info" ${n.type==='info'?'selected':''}>通知</option>
+            <option value="warning" ${n.type==='warning'?'selected':''}>提醒</option>
+            <option value="urgent" ${n.type==='urgent'?'selected':''}>紧急</option>
+          </select></div>
+          <div><label class="lbl">发布人</label><input class="input" id="n_from" value="${n.from||''}" placeholder="如：王老师"></div>
+        </div>
+        <div><label class="lbl">通知内容</label><textarea class="textarea" id="n_content" style="min-height:140px">${n.content||''}</textarea></div>
+      </div>`,
+      `<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="notices.save('${id||''}')">发布</button>`);
+  },
+  save(id){
+    const data={
+      title:document.getElementById('n_title').value.trim(),
+      content:document.getElementById('n_content').value.trim(),
+      from:document.getElementById('n_from').value.trim(),
+      type:document.getElementById('n_type').value
+    };
+    if(!data.title){toast('请填写通知标题');return}
+    if(id){Object.assign(store.notices.find(x=>x.id===id),data)}
+    else{store.notices.push({id:uid(),...data,read:false,createdAt:Date.now()})}
+    save();closeModal();notices.render();toast(id?'已更新':'已发布');
+  },
+  markRead(id){const n=store.notices.find(x=>x.id===id);n.read=true;save();notices.render()},
+  del(id){if(confirm('确定删除此通知？')){store.notices=store.notices.filter(x=>x.id!==id);save();notices.render();toast('已删除')}}
 };
 
 /* ============ Calendar Module ============ */
@@ -872,23 +1151,24 @@ const grades={
     const g=store.grades;
     const credits=g.reduce((s,x)=>s+(+x.credit||0),0);
     const score=g.reduce((s,x)=>s+(+x.score||0)*((+x.credit)||0),0);
-    const avg=g.length?score/credits:0;
+    const avg=credits>0?score/credits:0;
     const gpa=grades.calcGPA(avg);
     document.getElementById('gpaValue').textContent=gpa.toFixed(2);
     document.getElementById('creditSum').textContent=credits;
     document.getElementById('avgScore').textContent=avg.toFixed(1);
     const tbl=document.getElementById('gradeTable');
+    const canEdit=currentRole==='teacher';
     if(g.length===0){tbl.innerHTML='<div class="empty" style="padding:30px"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/></svg>暂无成绩</div>';return}
     tbl.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--border)">
-        <th style="padding:8px">课程</th><th>学分</th><th>成绩</th><th>GPA</th><th>操作</th></tr></thead>
+        <th style="padding:8px">课程</th><th>学分</th><th>成绩</th><th>GPA</th>${canEdit?'<th>操作</th>':''}</tr></thead>
       <tbody>${g.map(x=>`<tr style="border-bottom:1px solid var(--border)">
         <td style="padding:10px 8px;font-weight:600">${x.name}</td>
         <td>${x.credit}</td>
         <td><span class="tag ${x.score>=90?'tag-low':x.score>=60?'tag-mid':'tag-high'}">${x.score}</span></td>
         <td>${grades.scoreToGPA(x.score).toFixed(2)}</td>
-        <td><button class="btn btn-ghost btn-sm" onclick="grades.openModal('${x.id}')">编辑</button>
-        <button class="btn btn-ghost btn-sm" onclick="grades.del('${x.id}')">删除</button></td>
+        ${canEdit?`<td><button class="btn btn-ghost btn-sm" onclick="grades.openModal('${x.id}')">编辑</button>
+        <button class="btn btn-ghost btn-sm" onclick="grades.del('${x.id}')">删除</button></td>`:''}
       </tr>`).join('')}</tbody></table>`;
     // chart
     const ctx=document.getElementById('gradeChart');
@@ -902,6 +1182,7 @@ const grades={
   scoreToGPA(s){s=+s;if(s>=90)return 4.0;if(s>=85)return 3.7;if(s>=82)return 3.3;if(s>=78)return 3.0;if(s>=75)return 2.7;if(s>=72)return 2.3;if(s>=68)return 2.0;if(s>=64)return 1.5;if(s>=60)return 1.0;return 0},
   calcGPA(avg){return grades.scoreToGPA(avg)},
   openModal(id){
+    if(currentRole!=='teacher'){toast('仅老师可管理成绩');return}
     const g=id?store.grades.find(x=>x.id===id):{name:'',credit:'',score:''};
     openModal(id?'编辑成绩':'添加成绩',`
       <div style="display:grid;gap:12px">
@@ -1127,6 +1408,28 @@ const dashboard={
         <div class="task-meta">${c.date}</div></div>
         <div style="font-weight:800;color:var(--accent);font-size:18px">${days}<span style="font-size:11px;color:var(--muted)">天</span></div>
       </div>`}).join('')}
+
+    // homework
+    const dhw=document.getElementById('dashHomework');
+    const pendingHw=store.homework.filter(h=>!h.done).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999')).slice(0,5);
+    if(pendingHw.length===0){dhw.innerHTML='<div style="color:var(--muted);text-align:center;padding:16px;font-size:13px">暂无待完成作业 🎉</div>'}
+    else{dhw.innerHTML=pendingHw.map(h=>{const overdue=h.due&&h.due<today;return `
+      <div class="task-item" style="margin-bottom:6px">
+        <div class="task-body"><div class="task-title">${h.title}</div>
+        <div class="task-meta"><span class="tag tag-cat">${h.subject||'未分类'}</span>${h.due?`<span>📅 ${fmtDate(h.due)}</span>`:''}</div></div>
+        ${overdue?'<span class="tag tag-high">逾期</span>':''}
+      </div>`}).join('')}
+
+    // notices
+    const dn=document.getElementById('dashNotices');
+    const recentN=store.notices.slice(-3).reverse();
+    if(recentN.length===0){dn.innerHTML='<div style="color:var(--muted);text-align:center;padding:16px;font-size:13px">暂无通知</div>'}
+    else{dn.innerHTML=recentN.map(n=>`
+      <div class="task-item" style="margin-bottom:6px">
+        <div class="task-body"><div class="task-title">${n.title}</div>
+        <div class="task-meta">🕒 ${fmtDateTime(n.createdAt)}</div></div>
+        ${!n.read?'<span class="tag tag-high">新</span>':''}
+      </div>`).join('')}
   }
 };
 
@@ -1150,10 +1453,24 @@ function seedIfEmpty(){
       {id:uid(),title:'期末考试',date:exam.toISOString().slice(0,10),desc:'本学期期末'},
       {id:uid(),title:'英语四级',date:new Date(Date.now()+86400000*20).toISOString().slice(0,10),desc:'CET-4'},
     ];
+    store.homework=[
+      {id:uid(),title:'高等数学第三章习题',subject:'高等数学',desc:'完成教材第三章习题 1-15 题',due:new Date(Date.now()+86400000*2).toISOString().slice(0,10),teacher:'王教授',done:false,createdAt:Date.now()},
+      {id:uid(),title:'英语作文：My Dream',subject:'大学英语',desc:'写一篇 150 词的作文',due:new Date(Date.now()+86400000*5).toISOString().slice(0,10),teacher:'李老师',done:false,createdAt:Date.now()},
+      {id:uid(),title:'线性代数矩阵运算练习',subject:'线性代数',desc:'练习册 P45-P48',due:todayStr(),teacher:'张教授',done:true,createdAt:Date.now()},
+    ];
+    store.notices=[
+      {id:uid(),title:'下周一期中考试安排',content:'各位同学请注意，下周一将进行期中考试，考试时间为上午 9:00-11:00，请提前复习并准时到达考场。',from:'教务处',type:'warning',read:false,createdAt:Date.now()},
+      {id:uid(),title:'家长会通知',content:'本周五下午 3:00 在教学楼报告厅召开家长会，请各位家长准时参加。',from:'班主任',type:'info',read:false,createdAt:Date.now()-86400000},
+    ];
     save();
   }
 }
 seedIfEmpty();
+
+/* Init role UI */
+document.getElementById('roleSelect').value=currentRole;
+document.getElementById('roleIcon').textContent=ROLE_META[currentRole].icon;
+applyRoleUI();
 
 /* Initial render */
 tasks.render();
@@ -1163,6 +1480,8 @@ grades.render();
 notes.render();
 countdown.render();
 dashboard.render();
+homework.render();
+notices.render();
 pomodoro.update();
 pomodoro.renderLog();
 
