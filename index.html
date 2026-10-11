@@ -6,6 +6,19 @@
 <title>智学云 · 校园管理任务工作台</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script type="module">
+  // Firebase 实时同步配置 —— 填入你的 Firebase 项目配置即可开启跨设备实时同步
+  // 配置获取方式：console.firebase.google.com → 创建项目 → 添加 Web 应用 → 复制配置
+  window.FIREBASE_CONFIG = {
+    apiKey: "",
+    authDomain: "",
+    databaseURL: "",
+    projectId: "",
+    storageBucket: "",
+    messagingSenderId: "",
+    appId: ""
+  };
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -326,6 +339,7 @@
         <button class="icon-btn" id="themeBtn" title="切换主题"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
         <button class="icon-btn" id="exportBtn" title="导出数据"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></button>
         <button class="icon-btn" id="importBtn" title="导入数据"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg></button>
+        <button class="icon-btn" id="syncBtn" title="同步设置"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/></svg></button>
         <input type="file" id="importFile" accept=".json" style="display:none">
       </div>
       <div class="tiny">三端数据实时同步 · v2.0</div>
@@ -632,6 +646,82 @@
 <div class="toast" id="toast"></div>
 
 <script>
+/* ============ Firebase Realtime Sync ============ */
+// 跨设备实时同步核心：老师在手机上布置作业 → 学生/家长平板立即看到
+let _fbCfg = {};
+try{_fbCfg = JSON.parse(localStorage.getItem('zhixueyun_fbcfg')||'null') || {}}catch(e){}
+const FB_CFG = (_fbCfg && _fbCfg.apiKey) ? _fbCfg : (window.FIREBASE_CONFIG || {});
+const FB_ENABLED = !!(FB_CFG.apiKey && FB_CFG.databaseURL);
+let fbApp=null, fbDB=null, fbRef=null, fbConnected=false, fbModDB=null;
+let fbReady=false;
+
+function setSyncStatus(state){
+  const dot=document.getElementById('syncDot');
+  if(!dot)return;
+  dot.classList.remove('syncing');
+  dot.style.background='';
+  dot.style.boxShadow='';
+  if(state==='online'){dot.style.background='var(--success)';dot.style.boxShadow='0 0 0 2px rgba(16,185,129,.3)';dot.title='实时同步已连接'}
+  else if(state==='syncing'){dot.classList.add('syncing');dot.title='正在同步...'}
+  else if(state==='offline'){dot.style.background='var(--danger)';dot.style.boxShadow='0 0 0 2px rgba(239,68,68,.3)';dot.title='未连接 · 本地模式'}
+  else{dot.style.background='var(--muted)';dot.title='未配置同步'}
+}
+
+async function initFirebase(){
+  if(!FB_ENABLED){setSyncStatus('unconfigured');return}
+  try{
+    // 动态加载 Firebase SDK
+    const [modApp, modDB] = await Promise.all([
+      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
+      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js')
+    ]);
+    fbApp = modApp.initializeApp(FB_CFG);
+    fbModDB = modDB;
+    fbDB = modDB.getDatabase(fbApp);
+    fbRef = modDB.ref(fbDB, 'zhixueyun/shared');
+    const connRef = modDB.ref(fbDB, '.info/connected');
+    modDB.onValue(connRef, snap=>{
+      fbConnected = snap.val()===true;
+      setSyncStatus(fbConnected?'online':'offline');
+    });
+    // 监听远端数据变化 → 实时更新本地
+    modDB.onValue(fbRef, snap=>{
+      const remote = snap.val();
+      if(remote && typeof remote==='object'){
+        // 合并远端数据（远端优先）
+        const merged = {...store, ...remote};
+        ['tasks','schedule','grades','notes','countdowns','pomoLog','homework','notices'].forEach(k=>{
+          if(!Array.isArray(merged[k])) merged[k]=[];
+        });
+        if(!merged.theme) merged.theme='light';
+        store = merged;
+        DB.set(DB.key, store); // 缓存到本地
+        renderAll();
+        applyTheme();
+      }else{
+        // 远端为空 → 把本地数据推上去
+        fbPush();
+      }
+    });
+    fbReady = true;
+    setSyncStatus('syncing');
+  }catch(e){
+    console.error('Firebase init failed:', e);
+    setSyncStatus('offline');
+  }
+}
+
+function fbPush(){
+  if(!fbReady||!fbRef||!fbModDB)return;
+  setSyncStatus('syncing');
+  fbModDB.set(fbRef, store).then(()=>{
+    setSyncStatus(fbConnected?'online':'offline');
+  }).catch(err=>{
+    console.error('Firebase sync error:', err);
+    setSyncStatus('offline');
+  });
+}
+
 /* ============ Data Layer ============ */
 const DB = {
   get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
@@ -639,11 +729,19 @@ const DB = {
   key:'studyhub_v1',
   roleKey:'studyhub_role'
 };
-let store = DB.get(DB.key, {
+const DEFAULT_STORE = {
   tasks:[], schedule:[], grades:[], notes:[], countdowns:[], pomoLog:[], theme:'light',
   homework:[], notices:[]
-});
-function save(){DB.set(DB.key,store);broadcastSync()}
+};
+let store = {...DEFAULT_STORE, ...DB.get(DB.key, {})};
+// 确保所有字段存在
+Object.keys(DEFAULT_STORE).forEach(k=>{if(store[k]===undefined)store[k]=DEFAULT_STORE[k]});
+
+function save(){
+  DB.set(DB.key, store);
+  broadcastSync();   // 同浏览器多标签同步
+  fbPush();          // 跨设备实时同步
+}
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const todayStr=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 const fmtDate=(s)=>{if(!s)return '';const d=new Date(s);return `${d.getMonth()+1}月${d.getDate()}日`};
@@ -665,23 +763,25 @@ function setRole(r){
   toast(`已切换到${ROLE_META[r].name}端`);
 }
 function applyRoleUI(){
-  // teachers can manage schedule, homework, grades, notices
   const isTeacher = currentRole==='teacher';
-  // homework add button
   const hwAdd=document.getElementById('hwAddBtn');if(hwAdd)hwAdd.style.display=isTeacher?'':'none';
   const noticeAdd=document.getElementById('noticeAddBtn');if(noticeAdd)noticeAdd.style.display=isTeacher?'':'none';
-  // schedule add button
   const schedAdd=document.querySelector('#view-schedule .btn-primary');if(schedAdd)schedAdd.style.display=isTeacher?'':'none';
-  // grades add button
   const gradeAdd=document.querySelector('#view-grades .btn-primary');if(gradeAdd)gradeAdd.style.display=isTeacher?'':'none';
 }
 function renderAll(){
-  tasks.render();schedule.render();calendar.render();grades.render();
-  notes.render();countdown.render();dashboard.render();
-  homework.render();notices.render();
+  if(typeof tasks!=='undefined')tasks.render();
+  if(typeof schedule!=='undefined')schedule.render();
+  if(typeof calendar!=='undefined')calendar.render();
+  if(typeof grades!=='undefined')grades.render();
+  if(typeof notes!=='undefined')notes.render();
+  if(typeof countdown!=='undefined')countdown.render();
+  if(typeof dashboard!=='undefined')dashboard.render();
+  if(typeof homework!=='undefined')homework.render();
+  if(typeof notices!=='undefined')notices.render();
 }
 
-/* Real-time sync across tabs */
+/* Same-browser cross-tab sync (fallback / supplement) */
 let bc=null;
 try{bc=new BroadcastChannel('studyhub_sync')}catch(e){bc=null}
 function broadcastSync(){
@@ -698,14 +798,12 @@ if(bc){
 window.addEventListener('storage',(e)=>{
   if(e.key===DB.key){
     const fresh=DB.get(DB.key,null);
-    if(fresh){store=fresh;renderAll();toast('数据已同步')}
+    if(fresh){store=fresh;renderAll()}
   }
 });
-function pulseSync(){
-  const dot=document.getElementById('syncDot');
-  dot.classList.add('syncing');
-  setTimeout(()=>dot.classList.remove('syncing'),600);
-}
+
+/* 启动 Firebase */
+initFirebase();
 
 /* ============ Navigation ============ */
 document.getElementById('nav').addEventListener('click',e=>{
@@ -755,6 +853,91 @@ document.getElementById('importFile').onchange=(e)=>{
   const r=new FileReader();
   r.onload=()=>{try{store=JSON.parse(r.result);save();location.reload()}catch(err){toast('导入失败：文件格式错误')}};
   r.readAsText(f);
+};
+
+/* Sync Settings - Firebase config via UI */
+const SYNC_CFG_KEY='zhixueyun_fbcfg';
+document.getElementById('syncBtn').onclick=()=>{
+  const saved=DB.get(SYNC_CFG_KEY, null);
+  const cfg = saved || FB_CFG;
+  const statusText = FB_ENABLED 
+    ? (fbConnected ? '<span style="color:var(--success)">● 已连接 · 实时同步中</span>' : '<span style="color:var(--warn)">● 连接中...</span>')
+    : '<span style="color:var(--muted)">● 未配置 · 仅本地存储</span>';
+  openModal('同步设置',`
+    <div style="display:grid;gap:12px">
+      <div style="font-size:13px;line-height:1.7;background:var(--surface-2);padding:12px;border-radius:10px">
+        <div style="font-weight:700;margin-bottom:6px">当前状态：${statusText}</div>
+        配置 Firebase 后，老师/学生/家长三端数据将实时同步（老师布置作业 → 学生家长立即看到）。
+      </div>
+      <details style="font-size:12px;color:var(--muted);line-height:1.7">
+        <summary style="cursor:pointer;font-weight:600">📋 如何获取 Firebase 配置（3步）</summary>
+        <div style="margin-top:8px;padding-left:4px">
+          1. 打开 <b>console.firebase.google.com</b>，点击「添加项目」<br>
+          2. 项目创建后，点击「</>」添加 Web 应用，复制配置对象<br>
+          3. 在左侧「构建 → Realtime Database」创建数据库，规则选择「测试模式」<br>
+          4. 把配置粘贴到下方，点击保存即可
+        </div>
+      </details>
+      <div>
+        <label class="lbl">apiKey</label>
+        <input class="input" id="fb_apiKey" value="${cfg.apiKey||''}">
+      </div>
+      <div>
+        <label class="lbl">authDomain</label>
+        <input class="input" id="fb_authDomain" value="${cfg.authDomain||''}">
+      </div>
+      <div>
+        <label class="lbl">databaseURL</label>
+        <input class="input" id="fb_databaseURL" value="${cfg.databaseURL||''}" placeholder="https://xxx-default-rtdb.firebaseio.com">
+      </div>
+      <div>
+        <label class="lbl">projectId</label>
+        <input class="input" id="fb_projectId" value="${cfg.projectId||''}">
+      </div>
+      <div>
+        <label class="lbl">storageBucket</label>
+        <input class="input" id="fb_storageBucket" value="${cfg.storageBucket||''}">
+      </div>
+      <div>
+        <label class="lbl">messagingSenderId</label>
+        <input class="input" id="fb_messagingSenderId" value="${cfg.messagingSenderId||''}">
+      </div>
+      <div>
+        <label class="lbl">appId</label>
+        <input class="input" id="fb_appId" value="${cfg.appId||''}">
+      </div>
+    </div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">取消</button>
+     <button class="btn btn-ghost" onclick="syncSettings.clear()">清除配置</button>
+     <button class="btn btn-primary" onclick="syncSettings.save()">保存并启用</button>`);
+};
+const syncSettings={
+  save(){
+    const cfg={
+      apiKey:document.getElementById('fb_apiKey').value.trim(),
+      authDomain:document.getElementById('fb_authDomain').value.trim(),
+      databaseURL:document.getElementById('fb_databaseURL').value.trim(),
+      projectId:document.getElementById('fb_projectId').value.trim(),
+      storageBucket:document.getElementById('fb_storageBucket').value.trim(),
+      messagingSenderId:document.getElementById('fb_messagingSenderId').value.trim(),
+      appId:document.getElementById('fb_appId').value.trim()
+    };
+    if(!cfg.apiKey||!cfg.databaseURL){toast('请至少填写 apiKey 和 databaseURL');return}
+    DB.set(SYNC_CFG_KEY, cfg);
+    window.FIREBASE_CONFIG=cfg;
+    toast('配置已保存，正在连接...');
+    closeModal();
+    // 重新加载以初始化 Firebase
+    setTimeout(()=>location.reload(),800);
+  },
+  clear(){
+    if(confirm('确定清除同步配置？将回到本地模式。')){
+      DB.set(SYNC_CFG_KEY, null);
+      closeModal();
+      toast('已清除，刷新后生效');
+      setTimeout(()=>location.reload(),600);
+    }
+  }
 };
 
 /* Modal */
