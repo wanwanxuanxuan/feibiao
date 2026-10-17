@@ -186,7 +186,9 @@ ghSync={
     return `https://api.github.com/repos/${owner}/${repo}/contents/${path}?${qs.join('&')}`;
   },
   headers(){
-    const h={'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Cache-Control':'no-store'};
+    // 注意：不要加 Cache-Control —— GitHub 的 CORS 预检不允许该请求头，会导致 fetch 直接被浏览器拦截
+    // 禁用缓存已由 URL 上的 _=timestamp 参数与 fetch 的 cache:'no-store' 完成
+    const h={'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
     if(this.token())h['Authorization']='Bearer '+this.token();
     return h;
   },
