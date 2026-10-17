@@ -699,7 +699,7 @@
       <button class="btn btn-ghost" style="flex:1" onclick="auth.lockExit()">进入学生端</button>
       <button class="btn btn-primary" style="flex:1" id="lockBtn" onclick="auth.lockSubmit()">解锁</button>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:12px">老师可在「同步与设置」中修改密码</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:12px">可在「同步与设置」中修改老师端 / 家长端密码（初始密码 123456）</div>
   </div>
 </div>
 
@@ -741,7 +741,7 @@ const DB = {
 };
 const DEFAULT_STORE = {
   tasks:[], schedule:[], grades:[], notes:[], countdowns:[], pomoLog:[], theme:'light',
-  homework:[], notices:[], teacherPwd:null, _meta:null
+  homework:[], notices:[], teacherPwd:null, parentPwd:null, _meta:null
 };
 let store = {...DEFAULT_STORE, ...DB.get(DB.key, {})};
 // 确保所有字段存在
@@ -767,9 +767,14 @@ const ROLE_META = {
   student:{name:'学生',icon:'🧑‍🎓',greet:'同学'},
   parent:{name:'家长',icon:'👨‍👩‍👧',greet:'家长'}
 };
-const ROLE_UNLOCK_KEY='zhixueyun_teacher_ok';
+/* 老师端 / 家长端进入时均需密码；初始密码 123456，可自行修改 */
+const DEF_PWD='123456';
+const PROTECTED_ROLES=['teacher','parent'];
 const auth={
-  has(){return !!(store.teacherPwd&&store.teacherPwd.hash)},
+  protected(r){return PROTECTED_ROLES.indexOf(r)>=0},
+  pwd(r){return store[r+'Pwd']},
+  has(r){const p=this.pwd(r);return !!(p&&p.hash)},
+  isDefault(r){const p=this.pwd(r);return !!(p&&p.hash==='default')},
   async hash(p){
     const s='zhixueyun::'+p;
     try{
@@ -781,91 +786,52 @@ const auth={
     let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))>>>0;
     return 'djb2:'+h.toString(16);
   },
-  async verify(p){const h=await this.hash(p);return !!(store.teacherPwd&&store.teacherPwd.hash===h)},
-  async setPwd(p){store.teacherPwd={hash:await this.hash(p),at:Date.now()};save()},
-  clearPwd(){store.teacherPwd=null;save()},
-  unlocked(){return sessionStorage.getItem(ROLE_UNLOCK_KEY)==='1'},
-  unlock(){sessionStorage.setItem(ROLE_UNLOCK_KEY,'1')},
-  /* 切换角色时的密码校验（弹窗） */
-  ask(onOk,onCancel){
-    openModal('老师端验证','<div style="display:grid;gap:12px">'+
-      '<div style="font-size:13px;color:var(--muted)">该功能受密码保护，请输入老师密码。</div>'+
-      '<input type="password" class="input" id="ask_pwd" placeholder="老师密码" autocomplete="off">'+
-      '<div class="lock-err" id="ask_err"></div></div>',
-      '<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="auth.askSubmit()">确认</button>');
-    auth._onOk=onOk;auth._onCancel=onCancel;
-    setTimeout(()=>{const el=document.getElementById('ask_pwd');if(el)el.focus()},80);
+  async verify(r,p){
+    const P=this.pwd(r);if(!P||!P.hash)return false;
+    if(P.hash==='default')return p===DEF_PWD;      // 初始密码直接比对
+    return (await this.hash(p))===P.hash;
   },
-  async askSubmit(){
-    const v=(document.getElementById('ask_pwd')||{}).value||'';
-    const err=document.getElementById('ask_err');
-    if(await auth.verify(v)){closeModal();if(auth._onOk)auth._onOk();auth._onOk=auth._onCancel=null}
-    else if(err)err.textContent='密码不正确，请重试';
-  },
-  /* 首次设置密码（弹窗） */
-  askSet(onOk,onCancel){
-    openModal('设置老师密码','<div style="display:grid;gap:12px">'+
-      '<div style="font-size:13px;color:var(--muted)">首次进入老师端，请设置一个密码（至少 4 位）。该密码用于保护课程表 / 作业 / 成绩等管理功能。</div>'+
-      '<input type="password" class="input" id="set_pwd" placeholder="设置密码" autocomplete="off">'+
-      '<input type="password" class="input" id="set_pwd2" placeholder="确认密码" autocomplete="off">'+
-      '<div class="lock-err" id="ask_err"></div></div>',
-      '<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="auth.setSubmit()">保存并进入</button>');
-    auth._onOk=onOk;auth._onCancel=onCancel;
-    setTimeout(()=>{const el=document.getElementById('set_pwd');if(el)el.focus()},80);
-  },
-  async setSubmit(){
-    const a=(document.getElementById('set_pwd')||{}).value||'';
-    const b=(document.getElementById('set_pwd2')||{}).value||'';
-    const err=document.getElementById('ask_err');
-    if(a.length<4){if(err)err.textContent='密码至少 4 位';return}
-    if(a!==b){if(err)err.textContent='两次输入不一致';return}
-    await auth.setPwd(a);auth.unlock();closeModal();
-    if(auth._onOk)auth._onOk();auth._onOk=auth._onCancel=null;
-  },
-  /* 加载页锁定层 */
-  _locked:false,
-  lockShow(mode){
-    auth._locked=true;
-    const mask=document.getElementById('lockMask');
-    const set=mode==='set';
-    document.getElementById('lockTitle').textContent=set?'首次使用 · 设置老师密码':'老师端已加密';
-    document.getElementById('lockTip').textContent=set?'请设置老师密码（至少 4 位），用于保护管理功能':'请输入老师密码以继续';
-    document.getElementById('lockBtn').textContent=set?'保存并进入':'解锁';
-    const p2=document.getElementById('lockPwd2');p2.style.display=set?'':'none';
-    document.getElementById('lockPwd').value='';p2.value='';
+  async setPwd(r,p){store[r+'Pwd']={hash:await this.hash(p),at:Date.now()};save()},
+  resetPwd(r){store[r+'Pwd']={hash:'default',at:Date.now()};save()},   // 还原为初始密码
+  unlocked(r){return sessionStorage.getItem('zhixueyun_unlock_'+r)==='1'},
+  unlock(r){sessionStorage.setItem('zhixueyun_unlock_'+r,'1')},
+  /* 全屏密码锁定层 */
+  lockShow(r){
+    auth._lockRole=r;
+    const m=ROLE_META[r];
+    document.getElementById('lockTitle').textContent=m.name+'端已加密';
+    document.getElementById('lockTip').textContent='请输入'+m.name+'端密码以继续（初始密码 '+DEF_PWD+'）';
+    document.getElementById('lockBtn').textContent='解锁';
+    const p2=document.getElementById('lockPwd2');p2.style.display='none';p2.value='';
+    document.getElementById('lockPwd').value='';
     document.getElementById('lockErr').textContent='';
-    mask.classList.add('show');
+    document.getElementById('lockMask').classList.add('show');
     setTimeout(()=>document.getElementById('lockPwd').focus(),100);
   },
   async lockSubmit(){
+    const r=auth._lockRole||'teacher';
     const v=document.getElementById('lockPwd').value||'';
     const err=document.getElementById('lockErr');
-    if(auth._lockMode==='set'||!auth.has()){
-      const b=document.getElementById('lockPwd2').value||'';
-      if(v.length<4){err.textContent='密码至少 4 位';return}
-      if(v!==b){err.textContent='两次输入不一致';return}
-      await auth.setPwd(v);auth.unlock();
-      document.getElementById('lockMask').classList.remove('show');auth._locked=false;
-      toast('老师密码已设置');
-      return;
-    }
-    if(await auth.verify(v)){
-      auth.unlock();
-      document.getElementById('lockMask').classList.remove('show');auth._locked=false;
-      toast('欢迎回来，老师');
+    if(await auth.verify(r,v)){
+      auth.unlock(r);
+      document.getElementById('lockMask').classList.remove('show');
+      toast('欢迎回来，'+ROLE_META[r].name);
+      const f=auth._afterUnlock;auth._afterUnlock=null;
+      if(typeof f==='function')f();
     }else{err.textContent='密码不正确，请重试';document.getElementById('lockPwd').value=''}
   },
   lockExit(){
-    document.getElementById('lockMask').classList.remove('show');auth._locked=false;
-    sessionStorage.setItem(ROLE_UNLOCK_KEY,'0');
+    document.getElementById('lockMask').classList.remove('show');
+    auth._afterUnlock=null;
+    const sel=document.getElementById('roleSelect');if(sel)sel.value='student';
     finishRole('student');
   }
 };
 function checkLock(){
-  if(currentRole!=='teacher')return;
-  if(auth.unlocked())return;
-  auth._lockMode=auth.has()?'verify':'set';
-  auth.lockShow(auth._lockMode);
+  if(!auth.protected(currentRole))return;
+  if(auth.unlocked(currentRole))return;
+  auth._afterUnlock=null;
+  auth.lockShow(currentRole);
 }
 function finishRole(r){
   currentRole=r;DB.set(DB.roleKey,r);
@@ -874,11 +840,12 @@ function finishRole(r){
   applyRoleUI();updateGreeting();renderAll();
   toast(`已切换到${ROLE_META[r].name}端`);
 }
-async function setRole(r){
-  if(r==='teacher'&&!auth.unlocked()){
-    if(auth.has())auth.ask(()=>{auth.unlock();finishRole('teacher')},()=>{document.getElementById('roleSelect').value=currentRole});
-    else auth.askSet(()=>{auth.unlock();finishRole('teacher')},()=>{document.getElementById('roleSelect').value=currentRole});
-    setTimeout(()=>{document.getElementById('roleSelect').value=currentRole},0);
+function setRole(r){
+  const sel=document.getElementById('roleSelect');
+  if(auth.protected(r)&&!auth.unlocked(r)){
+    if(sel)sel.value=currentRole;              // 还原下拉选择
+    auth._afterUnlock=()=>finishRole(r);       // 解锁后再真正切换
+    auth.lockShow(r);
     return;
   }
   finishRole(r);
@@ -894,7 +861,7 @@ function applyRoleUI(){
   toggle(document.getElementById('hintHomework'),!isTeacher);
   toggle(document.getElementById('hintGrades'),!isTeacher);
   const rt=document.getElementById('roleSelect');
-  if(rt)rt.title=isTeacher?'老师端：可管理课程表/作业/成绩/通知':'浏览模式：管理功能需老师密码';
+  if(rt)rt.title=isTeacher?'老师端：可管理课程表/作业/成绩/通知':(currentRole==='parent'?'家长端：查看课程表/作业/成绩与通知':'学生端：浏览与勾选完成进度');
 }
 /* 所有模块的渲染入口（统一注册，避免模块未定义时报错） */
 const RENDERERS=[];
@@ -978,10 +945,10 @@ ghSync={
   },
   apply(payload){
     this.applying=true;
-    const localPwd=store.teacherPwd;              // 老师密码仅存本机，不随同步数据覆盖
+    const tp=store.teacherPwd, pp=store.parentPwd;   // 老师/家长密码仅存本机，不随同步数据覆盖
     store=Object.assign({},DEFAULT_STORE,payload.data);
     Object.keys(DEFAULT_STORE).forEach(k=>{if(store[k]===undefined)store[k]=DEFAULT_STORE[k]});
-    store.teacherPwd=localPwd||null;
+    store.teacherPwd=tp||null;store.parentPwd=pp||null;
     store._meta={updatedAt:+payload.updatedAt||Date.now(),device:payload.device||'remote'};
     DB.set(DB.key,store);
     applyTheme();renderAll();updateGreeting();
@@ -1000,7 +967,7 @@ ghSync={
     try{
       if(!store._meta||!store._meta.updatedAt)store._meta={updatedAt:Date.now(),device:DEVICE_ID};
       const remoteData=Object.assign({},store);
-      delete remoteData.teacherPwd;              // 老师密码哈希不上传，仅保存在本机
+      delete remoteData.teacherPwd;delete remoteData.parentPwd;   // 密码哈希不上传，仅保存在本机
       const payload={v:1,updatedAt:store._meta.updatedAt,device:store._meta.device||DEVICE_ID,data:remoteData};
       const body={
         message:`同步数据 · ${new Date().toLocaleString('zh-CN')}`,
@@ -1102,7 +1069,7 @@ document.getElementById('themeBtn').onclick=()=>{
 /* Export / Import */
 document.getElementById('exportBtn').onclick=()=>{
   const clean=JSON.parse(JSON.stringify(store));
-  delete clean.teacherPwd;   // 密码哈希不随备份导出
+  delete clean.teacherPwd;delete clean.parentPwd;   // 密码哈希不随备份导出
   delete clean._meta;
   const blob=new Blob([JSON.stringify(clean,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`zhixueyun-${todayStr()}.json`;a.click();
@@ -1115,10 +1082,10 @@ document.getElementById('importFile').onchange=(e)=>{
   r.onload=()=>{
     try{
       const data=JSON.parse(r.result);
-      const pwd=store.teacherPwd;   // 保留本机已设置的老师密码
+      const tp=store.teacherPwd, pp=store.parentPwd;   // 保留本机已设置的老师/家长密码
       store=Object.assign({},DEFAULT_STORE,data);
       Object.keys(DEFAULT_STORE).forEach(k=>{if(store[k]===undefined)store[k]=DEFAULT_STORE[k]});
-      store.teacherPwd=pwd;
+      store.teacherPwd=tp;store.parentPwd=pp;
       save();applyTheme();renderAll();updateGreeting();
       toast('数据已导入');
     }catch(err){toast('导入失败：文件格式错误')}
@@ -1161,14 +1128,22 @@ const syncSettings={
           <div style="font-size:11px;color:var(--muted);margin-top:5px">令牌只保存在本设备浏览器，不会随同步数据上传，请勿在公共设备填写。</div>
         </div>
         <div id="gh_result" style="font-size:12px;color:var(--muted)"></div>
-        <div style="border-top:1px solid var(--border);padding-top:14px">
-          <div style="font-weight:700;font-size:13px;margin-bottom:6px">老师端密码</div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:10px">当前：${auth.has()?'<span style="color:var(--success)">已设置</span>（进入老师端需验证）':'<span style="color:var(--warn)">未设置</span>（进入老师端时会要求设置）'}</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <input class="input" id="pwd_new" type="password" placeholder="新密码（≥4 位）" style="flex:1;min-width:150px" autocomplete="off">
-            <button class="btn btn-ghost btn-sm" onclick="syncSettings.setPwd()">保存密码</button>
-            ${auth.has()?'<button class="btn btn-ghost btn-sm" onclick="syncSettings.clearPwd()">清除密码</button>':''}
-          </div>
+        <div style="border-top:1px solid var(--border);padding-top:14px;display:grid;gap:14px">
+          <div style="font-weight:700;font-size:13px">进入密码设置</div>
+          ${['teacher','parent'].map(r=>{
+            const m=ROLE_META[r];
+            const st=auth.isDefault(r)?'<span style="color:var(--warn)">初始密码 123456</span>'
+              :(auth.has(r)?'<span style="color:var(--success)">已自定义</span>':'<span style="color:var(--muted)">未设置</span>');
+            return `<div>
+              <div style="font-weight:600;font-size:13px;margin-bottom:4px">${m.name}端密码</div>
+              <div style="font-size:12px;color:var(--muted);margin-bottom:8px">当前：${st} · 进入${m.name}端需验证</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <input class="input" id="pwd_${r}" type="password" placeholder="新密码（≥4 位）" style="flex:1;min-width:150px" autocomplete="off">
+                <button class="btn btn-ghost btn-sm" onclick="syncSettings.setPwd('${r}')">保存</button>
+                <button class="btn btn-ghost btn-sm" onclick="syncSettings.resetPwd('${r}')">重置为 123456</button>
+              </div>
+            </div>`;
+          }).join('')}
         </div>
       </div>`,
       `<button class="btn btn-ghost" onclick="closeModal()">关闭</button>
@@ -1204,15 +1179,16 @@ const syncSettings={
     catch(e){out.innerHTML=`<span style="color:var(--danger)">✗ 连接失败：${esc(e.message)}</span>`}
     ghSync.cfg=bCfg;ghSync.setToken(bTok);
   },
-  async setPwd(){
-    const v=(document.getElementById('pwd_new')||{}).value||'';
+  async setPwd(role){
+    const v=(document.getElementById('pwd_'+role)||{}).value||'';
     if(v.length<4){toast('密码至少 4 位');return}
-    await auth.setPwd(v);auth.unlock();
-    toast('老师密码已更新');closeModal();
+    await auth.setPwd(role,v);auth.unlock(role);
+    toast(ROLE_META[role].name+'端密码已更新');closeModal();
   },
-  clearPwd(){
-    if(!confirm('确定清除老师密码？清除后进入老师端需要重新设置。'))return;
-    auth.clearPwd();auth.unlock();closeModal();toast('已清除老师密码');
+  resetPwd(role){
+    if(!confirm(`确定将${ROLE_META[role].name}端密码重置为初始密码 ${DEF_PWD}？`))return;
+    auth.resetPwd(role);auth.unlock(role);closeModal();
+    toast(ROLE_META[role].name+'端密码已重置为 '+DEF_PWD);
   }
 };
 document.getElementById('syncBtn').onclick=()=>syncSettings.open();
@@ -2042,44 +2018,32 @@ const dashboard={
   }
 };
 
-/* ============ Init with sample data ============ */
-function seedIfEmpty(){
-  if(store.tasks.length===0 && store.schedule.length===0 && store.countdowns.length===0){
-    store.tasks=[
-      {id:uid(),title:'完成高等数学作业',desc:'第三章习题 1-15',category:'学习',priority:'high',due:todayStr(),done:false,createdAt:Date.now()},
-      {id:uid(),title:'准备英语演讲',desc:'主题：My University Life',category:'学习',priority:'mid',due:todayStr(),done:false,createdAt:Date.now()},
-      {id:uid(),title:'社团招新会议',category:'社团',priority:'low',due:todayStr(),done:true,createdAt:Date.now()},
-      {id:uid(),title:'复习线性代数',category:'考试',priority:'high',due:new Date(Date.now()+86400000*3).toISOString().slice(0,10),done:false,createdAt:Date.now()},
-    ];
-    store.schedule=[
-      {id:uid(),name:'高等数学',teacher:'王教授',location:'教学楼A-301',day:new Date().getDay(),period:1},
-      {id:uid(),name:'大学英语',teacher:'李老师',location:'外语楼B-205',day:new Date().getDay(),period:3},
-      {id:uid(),name:'线性代数',teacher:'张教授',location:'教学楼A-402',day:(new Date().getDay()+1)%7,period:2},
-      {id:uid(),name:'程序设计',teacher:'陈老师',location:'实验楼C-101',day:(new Date().getDay()+2)%7,period:5},
-    ];
-    const exam=new Date();exam.setMonth(exam.getMonth()+1);
-    store.countdowns=[
-      {id:uid(),title:'期末考试',date:exam.toISOString().slice(0,10),desc:'本学期期末'},
-      {id:uid(),title:'英语四级',date:new Date(Date.now()+86400000*20).toISOString().slice(0,10),desc:'CET-4'},
-    ];
-    store.homework=[
-      {id:uid(),title:'高等数学第三章习题',subject:'高等数学',desc:'完成教材第三章习题',due:new Date(Date.now()+86400000*2).toISOString().slice(0,10),teacher:'王教授',done:false,createdAt:Date.now(),
-        items:[{id:uid(),text:'习题 1-5',done:true},{id:uid(),text:'习题 6-10',done:true},{id:uid(),text:'习题 11-15',done:false},{id:uid(),text:'整理错题',done:false}]},
-      {id:uid(),title:'英语作文：My Dream',subject:'大学英语',desc:'写一篇 150 词的作文',due:new Date(Date.now()+86400000*5).toISOString().slice(0,10),teacher:'李老师',done:false,createdAt:Date.now(),
-        items:[{id:uid(),text:'列提纲',done:true},{id:uid(),text:'写初稿',done:false},{id:uid(),text:'检查语法',done:false}]},
-      {id:uid(),title:'线性代数矩阵运算练习',subject:'线性代数',desc:'练习册 P45-P48',due:todayStr(),teacher:'张教授',done:true,createdAt:Date.now(),
-        items:[{id:uid(),text:'P45-P46',done:true},{id:uid(),text:'P47-P48',done:true}]},
-    ];
-    store.notices=[
-      {id:uid(),title:'下周一期中考试安排',content:'各位同学请注意，下周一将进行期中考试，考试时间为上午 9:00-11:00，请提前复习并准时到达考场。',from:'教务处',type:'warning',read:false,createdAt:Date.now()},
-      {id:uid(),title:'家长会通知',content:'本周五下午 3:00 在教学楼报告厅召开家长会，请各位家长准时参加。',from:'班主任',type:'info',read:false,createdAt:Date.now()-86400000},
-    ];
-    // 标记为「初始数据」：连接仓库同步时以远端数据优先
-    store._meta={updatedAt:0,device:DEVICE_ID};
+/* ============ 初始化：不含任何初始数据；老师/家长端密码默认 123456 ============ */
+function purgeDemoData(){
+  const MD='zhixueyun_no_demo_v1';
+  if(localStorage.getItem(MD)==='1')return;
+  // 旧版本内置的演示数据标记 + 已知示例标题，命中即视为演示数据，一次性清空
+  const sigs=['完成高等数学作业','准备英语演讲','社团招新会议','复习线性代数',
+    '高等数学第三章习题','英语作文：My Dream','线性代数矩阵运算练习',
+    '期末考试','英语四级','下周一期中考试安排','家长会通知'];
+  const hit=(arr)=>(arr||[]).some(x=>x&&sigs.indexOf(x.title)>=0);
+  const seeded=store._meta && +store._meta.updatedAt===0;
+  if(seeded || hit(store.tasks) || hit(store.homework) || hit(store.notices) || hit(store.countdowns)){
+    ['tasks','schedule','grades','notes','countdowns','pomoLog','homework','notices'].forEach(k=>store[k]=[]);
+    store._meta=null;
     DB.set(DB.key,store);
   }
+  localStorage.setItem(MD,'1');
 }
-seedIfEmpty();
+function ensurePwdDefaults(){
+  let changed=false;
+  PROTECTED_ROLES.forEach(r=>{
+    if(!store[r+'Pwd']){store[r+'Pwd']={hash:'default',at:0};changed=true}
+  });
+  if(changed)DB.set(DB.key,store);
+}
+purgeDemoData();
+ensurePwdDefaults();
 
 /* Init role UI */
 document.getElementById('roleSelect').value=currentRole;
