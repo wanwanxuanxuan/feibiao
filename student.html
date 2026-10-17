@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>智学云 · 校园管理任务工作台</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">🎓</div>
+      <div>
+        <div class="brand-name">智学云</div>
+        <div class="brand-sub">校园管理任务工作台</div>
+      </div>
+    </div>
+    <nav class="nav" id="nav">
+      <div class="nav-item active" data-view="dashboard"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>仪表盘</div>
+      <div class="nav-item" data-view="tasks"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>任务<span class="nav-badge" id="taskCount">0</span></div>
+      <div class="nav-item" data-view="schedule"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>课程表</div>
+      <div class="nav-item" data-view="homework"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>作业<span class="nav-badge" id="hwCount">0</span></div>
+      <div class="nav-item" data-view="notices"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>家校通知<span class="nav-badge" id="noticeCount">0</span></div>
+      <div class="nav-item" data-view="calendar"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>日历</div>
+      <div class="nav-item" data-view="grades"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>成绩</div>
+      <div class="nav-item" data-view="pomodoro"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>番茄钟</div>
+      <div class="nav-item" data-view="notes"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>笔记</div>
+      <div class="nav-item" data-view="countdown"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>倒计时</div>
+      <div class="nav-item" data-view="stats"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M7 14l4-4 4 4 5-5"/></svg>统计</div>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="flex items-center gap-2 mb-2">
+        <button class="icon-btn" id="themeBtn" title="切换主题"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
+        <button class="icon-btn" id="exportBtn" title="导出数据"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></button>
+        <button class="icon-btn" id="importBtn" title="导入数据"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg></button>
+        <button class="icon-btn" id="syncBtn" title="同步设置"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/></svg></button>
+        <input type="file" id="importFile" accept=".json" style="display:none">
+      </div>
+      <div class="tiny">三端数据实时同步 · v2.0</div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" id="menuBtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+      <div class="greeting" id="greeting">你好，同学<small id="greetingSub"></small></div>
+      <div class="top-actions">
+        <button class="role-switch" id="switchRoleBtn" title="切换端（返回端选择）">
+          <span class="role-ic" id="roleIcon">👨‍🏫</span>
+          <span class="role-select" id="roleName">老师端</span>
+          <span class="sync-dot" id="syncDot" title="同步状态"></span>
+        </button>
+        <div class="search-wrap" id="searchWrap">
+          <div class="search-box">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input id="globalSearch" placeholder="搜索任务、笔记、作业、通知..." autocomplete="off">
+          </div>
+          <div class="search-panel" id="searchPanel"></div>
+        </div>
+        <button class="icon-btn" id="settingsBtn" title="设置"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
+      </div>
+    </header>
+
+    <div class="content" id="content">
+      <!-- Dashboard -->
+      <section class="view active" id="view-dashboard">
+        <div class="grid grid-4" style="margin-bottom:16px">
+          <div class="stat-card">
+            <div class="glow" style="background:var(--primary)"></div>
+            <div class="label">今日待办</div>
+            <div class="value" id="statToday">0</div>
+            <div class="trend" id="statTodayTrend" style="color:var(--primary)">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="glow" style="background:var(--success)"></div>
+            <div class="label">已完成任务</div>
+            <div class="value" id="statDone">0</div>
+            <div class="trend" style="color:var(--success)">完成率 <span id="statRate">0</span>%</div>
+          </div>
+          <div class="stat-card">
+            <div class="glow" style="background:var(--accent)"></div>
+            <div class="label">本周专注</div>
+            <div class="value" id="statFocus">0<span style="font-size:14px;color:var(--muted);font-weight:600"> 分钟</span></div>
+            <div class="trend" style="color:var(--accent)">番茄数 <span id="statTomato">0</span></div>
+          </div>
+          <div class="stat-card">
+            <div class="glow" style="background:var(--info)"></div>
+            <div class="label">今日课程</div>
+            <div class="value" id="statCourse">0</div>
+            <div class="trend" style="color:var(--info)">节</div>
+          </div>
+        </div>
+
+        <div class="grid grid-2" style="margin-bottom:16px">
+          <div class="card card-pad">
+            <div class="card-title"><span class="dot"></span>今日任务</div>
+            <div id="dashTasks"></div>
+          </div>
+          <div class="card card-pad">
+            <div class="card-title"><span class="dot" style="background:var(--accent)"></span>今日课程</div>
+            <div id="dashCourses"></div>
+          </div>
+        </div>
+
+        <div class="grid grid-2">
+          <div class="card card-pad">
+            <div class="card-title"><span class="dot" style="background:var(--success)"></span>快速番茄钟</div>
+            <div style="text-align:center;padding:10px 0">
+              <div style="font-size:42px;font-weight:800;font-variant-numeric:tabular-nums" id="dashTimer">25:00</div>
+              <div style="color:var(--muted);font-size:12px;margin-bottom:12px">专注 25 分钟 · 休息 5 分钟</div>
+              <button class="btn btn-primary" onclick="pomodoro.start()" id="dashStartBtn">开始专注</button>
+              <button class="btn btn-ghost" onclick="pomodoro.reset()">重置</button>
+            </div>
+          </div>
+          <div class="card card-pad">
+            <div class="card-title"><span class="dot" style="background:var(--info)"></span>临近倒计时</div>
+            <div id="dashCountdown"></div>
+          </div>
+        </div>
+
+        <div class="grid grid-2" style="margin-top:16px">
+          <div class="card card-pad">
+            <div class="card-title"><span class="dot" style="background:var(--accent)"></span>待完成作业</div>
+            <div id="dashHomework"></div>
+          </div>
+          <div class="card card-pad">
+            <div class="card-title"><span class="dot" style="background:var(--primary)"></span>最新通知</div>
+            <div id="dashNotices"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tasks -->
+      <section class="view" id="view-tasks">
+        <div class="card card-pad" style="margin-bottom:16px">
+          <div class="flex" style="gap:12px;flex-wrap:wrap;align-items:center">
+            <input class="input" id="taskSearch" placeholder="搜索任务..." style="flex:1;min-width:200px">
+            <button class="btn btn-primary" onclick="tasks.openModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>新建任务</button>
+          </div>
+          <div class="filter-row" style="margin-top:12px">
+            <div class="chip active" data-filter="all">全部</div>
+            <div class="chip" data-filter="pending">进行中</div>
+            <div class="chip" data-filter="done">已完成</div>
+            <div class="chip" data-filter="today">今日</div>
+            <div class="chip" data-filter="overdue">已逾期</div>
+            <div style="margin-left:auto" class="filter-row">
+              <select class="select" id="catFilter" style="width:auto"><option value="">全部分类</option></select>
+              <select class="select" id="priFilter" style="width:auto"><option value="">全部优先级</option><option value="high">高</option><option value="mid">中</option><option value="low">低</option></select>
+            </div>
+          </div>
+        </div>
+        <div id="taskList"></div>
+      </section>
+
+      <!-- Schedule -->
+      <section class="view" id="view-schedule">
+        <div class="role-hint" id="hintSchedule">👀 当前为浏览模式，课程表由老师维护。</div>
+        <div class="card card-pad" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="card-title" style="margin:0"><span class="dot"></span>本学期课程表</div>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="schedule.prevWeek()">◀ 上周</button>
+            <div id="weekLabel" style="font-weight:600;font-size:13px;padding:6px 4px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="schedule.nextWeek()">下周 ▶</button>
+            <button class="btn btn-primary btn-sm" onclick="schedule.openModal()">+ 添加课程</button>
+          </div>
+        </div>
+        <div class="card card-pad">
+          <div class="sched-grid" id="schedGrid"></div>
+          <div style="margin-top:12px;font-size:12px;color:var(--muted)">提示：点击课程可编辑或删除。当前周会高亮显示。</div>
+        </div>
+      </section>
+
+      <!-- Homework -->
+      <section class="view" id="view-homework">
+        <div class="role-hint" id="hintHomework">👀 当前为浏览模式，作业由老师布置；勾选条目即可记录完成进度。</div>
+        <div class="card card-pad" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="card-title" style="margin:0"><span class="dot" style="background:var(--accent)"></span>作业管理</div>
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select class="select" id="hwSubjectFilter" style="width:auto"><option value="">全部科目</option></select>
+            <select class="select" id="hwStatusFilter" style="width:auto">
+              <option value="">全部状态</option>
+              <option value="pending">未完成</option>
+              <option value="done">已完成</option>
+              <option value="overdue">已逾期</option>
+            </select>
+            <button class="btn btn-primary btn-sm" id="hwAddBtn" onclick="homework.openModal()">+ 布置作业</button>
+          </div>
+        </div>
+        <div id="hwList"></div>
+      </section>
+
+      <!-- Notices -->
+      <section class="view" id="view-notices">
+        <div class="card card-pad" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="card-title" style="margin:0"><span class="dot" style="background:var(--info)"></span>家校通知</div>
+          <button class="btn btn-primary btn-sm" id="noticeAddBtn" style="margin-left:auto" onclick="notices.openModal()">+ 发布通知</button>
+        </div>
+        <div id="noticeList"></div>
+      </section>
+
+      <!-- Calendar -->
+      <section class="view" id="view-calendar">
+        <div class="card card-pad" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="card-title" style="margin:0"><span class="dot"></span><span id="calTitle"></span></div>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="calendar.prev()">◀</button>
+            <button class="btn btn-ghost btn-sm" onclick="calendar.today()">今天</button>
+            <button class="btn btn-ghost btn-sm" onclick="calendar.next()">▶</button>
+          </div>
+        </div>
+        <div class="card card-pad">
+          <div class="cal-grid">
+            <div class="cal-head">日</div><div class="cal-head">一</div><div class="cal-head">二</div><div class="cal-head">三</div><div class="cal-head">四</div><div class="cal-head">五</div><div class="cal-head">六</div>
+          </div>
+          <div class="cal-grid" id="calGrid" style="margin-top:6px"></div>
+        </div>
+      </section>
+
+      <!-- Grades -->
+      <section class="view" id="view-grades">
+        <div class="role-hint" id="hintGrades">👀 当前为浏览模式，成绩由老师录入。</div>
+        <div class="grid grid-3" style="margin-bottom:16px">
+          <div class="stat-card">
+            <div class="glow" style="background:var(--primary)"></div>
+            <div class="label">当前 GPA</div>
+            <div class="value" id="gpaValue">—</div>
+            <div class="trend" style="color:var(--primary)">4.0 满分制</div>
+          </div>
+          <div class="stat-card">
+            <div class="glow" style="background:var(--success)"></div>
+            <div class="label">总学分</div>
+            <div class="value" id="creditSum">0</div>
+            <div class="trend" style="color:var(--success)">已修读</div>
+          </div>
+          <div class="stat-card">
+            <div class="glow" style="background:var(--accent)"></div>
+            <div class="label">平均分</div>
+            <div class="value" id="avgScore">0</div>
+            <div class="trend" style="color:var(--accent)">百分制</div>
+          </div>
+        </div>
+        <div class="card card-pad" style="margin-bottom:16px">
+          <div class="flex" style="gap:12px;align-items:center;flex-wrap:wrap">
+            <div class="card-title" style="margin:0"><span class="dot"></span>成绩明细</div>
+            <button class="btn btn-primary" style="margin-left:auto" onclick="grades.openModal()">+ 添加课程</button>
+          </div>
+          <div id="gradeTable" style="margin-top:14px"></div>
+        </div>
+        <div class="card card-pad">
+          <div class="card-title"><span class="dot" style="background:var(--info)"></span>各科成绩分布</div>
+          <canvas id="gradeChart" height="100"></canvas>
+        </div>
+      </section>
+
+      <!-- Pomodoro -->
+      <section class="view" id="view-pomodoro">
+        <div class="grid grid-2">
+          <div class="card card-pad" style="text-align:center">
+            <div class="filter-row" style="justify-content:center;margin-bottom:18px">
+              <div class="chip active" data-mode="focus">专注 25:00</div>
+              <div class="chip" data-mode="short">短休 5:00</div>
+              <div class="chip" data-mode="long">长休 15:00</div>
+            </div>
+            <div class="timer-ring">
+              <svg width="280" height="280" viewBox="0 0 280 280">
+                <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#6d5efc"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient></defs>
+                <circle class="bg" cx="140" cy="140" r="126"/>
+                <circle class="fg" id="timerFg" cx="140" cy="140" r="126" stroke-dasharray="791.7" stroke-dashoffset="0"/>
+              </svg>
+              <div class="timer-display">
+                <div class="timer-num" id="pomoTime">25:00</div>
+                <div class="timer-label" id="pomoLabel">专注时间</div>
+              </div>
+            </div>
+            <div style="margin-top:20px;display:flex;gap:10px;justify-content:center">
+              <button class="btn btn-primary" id="pomoStartBtn" onclick="pomodoro.start()">开始</button>
+              <button class="btn btn-ghost" onclick="pomodoro.pause()">暂停</button>
+              <button class="btn btn-ghost" onclick="pomodoro.reset()">重置</button>
+            </div>
+          </div>
+          <div class="card card-pad">
+            <div class="card-title"><span class="dot"></span>专注记录</div>
+            <div id="pomoLog"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Notes -->
+      <section class="view" id="view-notes">
+        <div class="card card-pad" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="card-title" style="margin:0"><span class="dot"></span>我的笔记</div>
+          <button class="btn btn-primary" style="margin-left:auto" onclick="notes.openModal()">+ 新建笔记</button>
+        </div>
+        <div class="notes-grid" id="notesGrid"></div>
+      </section>
+
+      <!-- Countdown -->
+      <section class="view" id="view-countdown">
+        <div class="card card-pad" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="card-title" style="margin:0"><span class="dot"></span>重要日期倒计时</div>
+          <button class="btn btn-primary" style="margin-left:auto" onclick="countdown.openModal()">+ 添加倒计时</button>
+        </div>
+        <div class="grid grid-3" id="cdGrid"></div>
+      </section>
+
+      <!-- Stats -->
+      <section class="view" id="view-stats">
+        <div class="grid grid-2" style="margin-bottom:16px">
+          <div class="card card-pad">
+            <div class="card-title"><span class="dot"></span>任务完成趋势（近7天）</div>
+            <canvas id="chartTask" height="140"></canvas>
+          </div>
+          <div class="card card-pad">
+            <div class="card-title"><span class="dot" style="background:var(--accent)"></span>专注时长（近7天）</div>
+            <canvas id="chartFocus" height="140"></canvas>
+          </div>
+        </div>
+        <div class="grid grid-2">
+          <div class="card card-pad">
+            <div class="card-title"><span class="dot" style="background:var(--success)"></span>任务分类占比</div>
+            <canvas id="chartCat" height="160"></canvas>
+          </div>
+          <div class="card card-pad">
+            <div class="card-title"><span class="dot" style="background:var(--info)"></span>优先级分布</div>
+            <canvas id="chartPri" height="160"></canvas>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- Modal -->
+<div class="modal-mask" id="modalMask">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modalTitle">标题</h3><button class="close-btn" onclick="closeModal()">×</button></div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot" id="modalFoot"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- Teacher lock overlay -->
+<div class="lock-mask" id="lockMask">
+  <div class="lock-card">
+    <div class="em">🔒</div>
+    <div style="font-weight:800;font-size:18px;margin-top:10px" id="lockTitle">老师端已加密</div>
+    <div style="font-size:13px;color:var(--muted);margin:8px 0 16px" id="lockTip">请输入老师密码以继续</div>
+    <input type="password" class="input" id="lockPwd" placeholder="请输入密码" autocomplete="off" style="text-align:center">
+    <input type="password" class="input" id="lockPwd2" placeholder="请再次输入密码" autocomplete="off" style="text-align:center;margin-top:10px;display:none">
+    <div class="lock-err" id="lockErr"></div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-ghost" style="flex:1" onclick="auth.lockExit()">进入学生端</button>
+      <button class="btn btn-primary" style="flex:1" id="lockBtn" onclick="auth.lockSubmit()">解锁</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:12px">可在「设置」中修改老师端 / 家长端密码（初始密码 123456）</div>
+  </div>
+</div>
+
+<!-- 悬浮快捷按钮 -->
+<div class="fab-wrap" id="fabWrap">
+  <div class="fab-menu" id="fabMenu">
+    <button class="fab-item" data-act="task">📝 新建任务</button>
+    <button class="fab-item" data-act="note">📒 新建笔记</button>
+    <button class="fab-item" data-act="focus">⏱ 专注番茄钟</button>
+    <button class="fab-item" data-act="top">⬆ 回到顶部</button>
+    <button class="fab-item" data-act="switch">🔀 切换端</button>
+  </div>
+  <button class="fab" id="fabBtn" title="快捷操作">+</button>
+</div>
+
+
+<script>window.__PAGE_ROLE='student';</script>
+<script src="assets/app.js"></script>
+</body>
+</html>
