@@ -6,19 +6,6 @@
 <title>智学云 · 校园管理任务工作台</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script type="module">
-  // Firebase 实时同步配置 —— 填入你的 Firebase 项目配置即可开启跨设备实时同步
-  // 配置获取方式：console.firebase.google.com → 创建项目 → 添加 Web 应用 → 复制配置
-  window.FIREBASE_CONFIG = {
-    apiKey: "",
-    authDomain: "",
-    databaseURL: "",
-    projectId: "",
-    storageBucket: "",
-    messagingSenderId: "",
-    appId: ""
-  };
-</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -308,6 +295,54 @@
     pointer-events:none;
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+
+  /* a11y focus */
+  :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+  /* Global search panel */
+  .search-wrap{position:relative}
+  .search-panel{
+    position:absolute;top:calc(100% + 8px);right:0;width:min(400px,86vw);max-height:62vh;overflow-y:auto;
+    background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 18px 44px rgba(15,12,30,.2);
+    padding:8px;display:none;z-index:60;
+  }
+  .search-panel.show{display:block;animation:fadeIn .18s ease}
+  .search-group{font-size:11px;font-weight:700;color:var(--muted);padding:8px 10px 4px;letter-spacing:.03em}
+  .search-item{display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border-radius:10px;cursor:pointer;transition:background .15s}
+  .search-item:hover{background:var(--surface-2)}
+  .search-item .ic2{width:26px;height:26px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--surface-2)}
+  .search-item .t{font-size:13px;font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .search-item .s{font-size:11px;color:var(--muted);margin-top:2px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  mark{background:rgba(245,158,11,.28);color:inherit;border-radius:3px;padding:0 2px}
+
+  /* Progress / homework checklist */
+  .progress{height:6px;border-radius:999px;background:var(--surface-2);overflow:hidden;margin-top:8px}
+  .progress>i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--primary),var(--primary-2));transition:width .35s ease}
+  .progress.done>i{background:linear-gradient(90deg,var(--success),#34d399)}
+  .hw-items{margin-top:9px;display:flex;flex-direction:column;gap:2px}
+  .hw-item{display:flex;align-items:center;gap:9px;font-size:12.5px;padding:4px 5px;border-radius:7px;transition:background .15s}
+  .hw-item.clickable{cursor:pointer}
+  .hw-item.clickable:hover{background:var(--surface-2)}
+  .hw-item .box{width:15px;height:15px;border-radius:4px;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s}
+  .hw-item.done .box{background:var(--success);border-color:var(--success);color:#fff}
+  .hw-item.done .txt{text-decoration:line-through;color:var(--muted)}
+  .prog-text{font-size:11px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+  .done-flag{display:inline-flex;align-items:center;gap:5px;background:rgba(16,185,129,.14);color:var(--success);font-weight:700;font-size:11px;padding:3px 10px;border-radius:999px;animation:popIn .25s ease}
+  .flash{animation:flash 1.6s ease}
+  @keyframes flash{0%,100%{background:var(--surface)}30%{background:color-mix(in srgb,var(--primary) 14%,var(--surface))}}
+
+  /* Role hint */
+  .role-hint{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);background:var(--surface);border:1px dashed var(--border);border-radius:10px;padding:9px 12px;margin-bottom:14px}
+
+  /* Lock overlay */
+  .lock-mask{position:fixed;inset:0;z-index:200;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px}
+  .lock-mask.show{display:flex;animation:fadeIn .25s ease}
+  .lock-card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px;text-align:center;box-shadow:0 24px 60px rgba(15,12,30,.28)}
+  .lock-card .em{font-size:34px;line-height:1}
+  .lock-err{color:var(--danger);font-size:12px;min-height:16px;margin-top:6px}
+
+  /* dark mode note cards */
+  html.dark .note-card{filter:brightness(.84)}
 </style>
 </head>
 <body>
@@ -361,9 +396,12 @@
           </select>
           <span class="sync-dot" id="syncDot" title="同步状态"></span>
         </div>
-        <div class="search-box">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-          <input id="globalSearch" placeholder="搜索任务、笔记...">
+        <div class="search-wrap" id="searchWrap">
+          <div class="search-box">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input id="globalSearch" placeholder="搜索任务、笔记、作业、通知..." autocomplete="off">
+          </div>
+          <div class="search-panel" id="searchPanel"></div>
         </div>
         <button class="icon-btn" id="quickAddBtn" title="快速添加"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
       </div>
@@ -462,6 +500,7 @@
 
       <!-- Schedule -->
       <section class="view" id="view-schedule">
+        <div class="role-hint" id="hintSchedule">👀 当前为浏览模式，课程表由老师维护。</div>
         <div class="card card-pad" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
           <div class="card-title" style="margin:0"><span class="dot"></span>本学期课程表</div>
           <div style="margin-left:auto;display:flex;gap:8px">
@@ -479,6 +518,7 @@
 
       <!-- Homework -->
       <section class="view" id="view-homework">
+        <div class="role-hint" id="hintHomework">👀 当前为浏览模式，作业由老师布置；勾选条目即可记录完成进度。</div>
         <div class="card card-pad" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
           <div class="card-title" style="margin:0"><span class="dot" style="background:var(--accent)"></span>作业管理</div>
           <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -524,6 +564,7 @@
 
       <!-- Grades -->
       <section class="view" id="view-grades">
+        <div class="role-hint" id="hintGrades">👀 当前为浏览模式，成绩由老师录入。</div>
         <div class="grid grid-3" style="margin-bottom:16px">
           <div class="stat-card">
             <div class="glow" style="background:var(--primary)"></div>
@@ -645,82 +686,51 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script>
-/* ============ Firebase Realtime Sync ============ */
-// 跨设备实时同步核心：老师在手机上布置作业 → 学生/家长平板立即看到
-let _fbCfg = {};
-try{_fbCfg = JSON.parse(localStorage.getItem('zhixueyun_fbcfg')||'null') || {}}catch(e){}
-const FB_CFG = (_fbCfg && _fbCfg.apiKey) ? _fbCfg : (window.FIREBASE_CONFIG || {});
-const FB_ENABLED = !!(FB_CFG.apiKey && FB_CFG.databaseURL);
-let fbApp=null, fbDB=null, fbRef=null, fbConnected=false, fbModDB=null;
-let fbReady=false;
+<!-- Teacher lock overlay -->
+<div class="lock-mask" id="lockMask">
+  <div class="lock-card">
+    <div class="em">🔒</div>
+    <div style="font-weight:800;font-size:18px;margin-top:10px" id="lockTitle">老师端已加密</div>
+    <div style="font-size:13px;color:var(--muted);margin:8px 0 16px" id="lockTip">请输入老师密码以继续</div>
+    <input type="password" class="input" id="lockPwd" placeholder="请输入密码" autocomplete="off" style="text-align:center">
+    <input type="password" class="input" id="lockPwd2" placeholder="请再次输入密码" autocomplete="off" style="text-align:center;margin-top:10px;display:none">
+    <div class="lock-err" id="lockErr"></div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-ghost" style="flex:1" onclick="auth.lockExit()">进入学生端</button>
+      <button class="btn btn-primary" style="flex:1" id="lockBtn" onclick="auth.lockSubmit()">解锁</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:12px">老师可在「同步与设置」中修改密码</div>
+  </div>
+</div>
 
+<script>
+/* ============ 同步状态指示 ============ */
 function setSyncStatus(state){
   const dot=document.getElementById('syncDot');
   if(!dot)return;
   dot.classList.remove('syncing');
   dot.style.background='';
   dot.style.boxShadow='';
-  if(state==='online'){dot.style.background='var(--success)';dot.style.boxShadow='0 0 0 2px rgba(16,185,129,.3)';dot.title='实时同步已连接'}
+  if(state==='online'){dot.style.background='var(--success)';dot.style.boxShadow='0 0 0 2px rgba(16,185,129,.3)';dot.title='已同步到 GitHub 仓库'}
   else if(state==='syncing'){dot.classList.add('syncing');dot.title='正在同步...'}
-  else if(state==='offline'){dot.style.background='var(--danger)';dot.style.boxShadow='0 0 0 2px rgba(239,68,68,.3)';dot.title='未连接 · 本地模式'}
-  else{dot.style.background='var(--muted)';dot.title='未配置同步'}
+  else if(state==='offline'){dot.style.background='var(--danger)';dot.style.boxShadow='0 0 0 2px rgba(239,68,68,.3)';dot.title='同步失败 · 已回退本地模式'}
+  else{dot.style.background='var(--muted)';dot.title='未开启同步 · 仅本地存储'}
 }
 
-async function initFirebase(){
-  if(!FB_ENABLED){setSyncStatus('unconfigured');return}
-  try{
-    // 动态加载 Firebase SDK
-    const [modApp, modDB] = await Promise.all([
-      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
-      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js')
-    ]);
-    fbApp = modApp.initializeApp(FB_CFG);
-    fbModDB = modDB;
-    fbDB = modDB.getDatabase(fbApp);
-    fbRef = modDB.ref(fbDB, 'zhixueyun/shared');
-    const connRef = modDB.ref(fbDB, '.info/connected');
-    modDB.onValue(connRef, snap=>{
-      fbConnected = snap.val()===true;
-      setSyncStatus(fbConnected?'online':'offline');
-    });
-    // 监听远端数据变化 → 实时更新本地
-    modDB.onValue(fbRef, snap=>{
-      const remote = snap.val();
-      if(remote && typeof remote==='object'){
-        // 合并远端数据（远端优先）
-        const merged = {...store, ...remote};
-        ['tasks','schedule','grades','notes','countdowns','pomoLog','homework','notices'].forEach(k=>{
-          if(!Array.isArray(merged[k])) merged[k]=[];
-        });
-        if(!merged.theme) merged.theme='light';
-        store = merged;
-        DB.set(DB.key, store); // 缓存到本地
-        renderAll();
-        applyTheme();
-      }else{
-        // 远端为空 → 把本地数据推上去
-        fbPush();
-      }
-    });
-    fbReady = true;
-    setSyncStatus('syncing');
-  }catch(e){
-    console.error('Firebase init failed:', e);
-    setSyncStatus('offline');
-  }
-}
-
-function fbPush(){
-  if(!fbReady||!fbRef||!fbModDB)return;
-  setSyncStatus('syncing');
-  fbModDB.set(fbRef, store).then(()=>{
-    setSyncStatus(fbConnected?'online':'offline');
-  }).catch(err=>{
-    console.error('Firebase sync error:', err);
-    setSyncStatus('offline');
-  });
-}
+/* ============ GitHub 仓库文件同步（配置项） ============ */
+// 数据保存在仓库中的一个 JSON 文件里，所有设备通过 GitHub Contents API 读写同一文件实现同步
+const GH_CFG_KEY='zhixueyun_ghcfg';
+const GH_TOKEN_KEY='zhixueyun_ghtoken';
+const GH_DEV_KEY='zhixueyun_device';
+const GH_DEFAULTS={owner:'wanwanxuanxuan',repo:'feibiao',branch:'main',path:'data.json'};
+let ghSync=null; // 在 Store 定义之后初始化
+const DEVICE_ID=(()=>{
+  let d=DBraw(GH_DEV_KEY,null);
+  if(!d){d='dev_'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);DBraw(GH_DEV_KEY,d)}
+  return d;
+})();
+function DBraw(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function DBrawSet(k,v){localStorage.setItem(k,JSON.stringify(v))}
 
 /* ============ Data Layer ============ */
 const DB = {
@@ -731,55 +741,165 @@ const DB = {
 };
 const DEFAULT_STORE = {
   tasks:[], schedule:[], grades:[], notes:[], countdowns:[], pomoLog:[], theme:'light',
-  homework:[], notices:[]
+  homework:[], notices:[], teacherPwd:null, _meta:null
 };
 let store = {...DEFAULT_STORE, ...DB.get(DB.key, {})};
 // 确保所有字段存在
 Object.keys(DEFAULT_STORE).forEach(k=>{if(store[k]===undefined)store[k]=DEFAULT_STORE[k]});
 
 function save(){
+  store._meta={updatedAt:Date.now(),device:DEVICE_ID};
   DB.set(DB.key, store);
-  broadcastSync();   // 同浏览器多标签同步
-  fbPush();          // 跨设备实时同步
+  broadcastSync();              // 同浏览器多标签同步
+  if(ghSync)ghSync.schedulePush(); // 跨设备同步（GitHub 仓库文件）
 }
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const todayStr=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 const fmtDate=(s)=>{if(!s)return '';const d=new Date(s);return `${d.getMonth()+1}月${d.getDate()}日`};
 const fmtDateTime=(s)=>{const d=new Date(s);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
-function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2000)}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
-/* ============ Role & Sync ============ */
+/* ============ Role & Auth ============ */
 let currentRole = DB.get(DB.roleKey, 'teacher');
 const ROLE_META = {
   teacher:{name:'老师',icon:'👨‍🏫',greet:'老师'},
   student:{name:'学生',icon:'🧑‍🎓',greet:'同学'},
   parent:{name:'家长',icon:'👨‍👩‍👧',greet:'家长'}
 };
-function setRole(r){
+const ROLE_UNLOCK_KEY='zhixueyun_teacher_ok';
+const auth={
+  has(){return !!(store.teacherPwd&&store.teacherPwd.hash)},
+  async hash(p){
+    const s='zhixueyun::'+p;
+    try{
+      if(window.crypto&&crypto.subtle){
+        const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));
+        return 'sha256:'+Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+      }
+    }catch(e){}
+    let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))>>>0;
+    return 'djb2:'+h.toString(16);
+  },
+  async verify(p){const h=await this.hash(p);return !!(store.teacherPwd&&store.teacherPwd.hash===h)},
+  async setPwd(p){store.teacherPwd={hash:await this.hash(p),at:Date.now()};save()},
+  clearPwd(){store.teacherPwd=null;save()},
+  unlocked(){return sessionStorage.getItem(ROLE_UNLOCK_KEY)==='1'},
+  unlock(){sessionStorage.setItem(ROLE_UNLOCK_KEY,'1')},
+  /* 切换角色时的密码校验（弹窗） */
+  ask(onOk,onCancel){
+    openModal('老师端验证','<div style="display:grid;gap:12px">'+
+      '<div style="font-size:13px;color:var(--muted)">该功能受密码保护，请输入老师密码。</div>'+
+      '<input type="password" class="input" id="ask_pwd" placeholder="老师密码" autocomplete="off">'+
+      '<div class="lock-err" id="ask_err"></div></div>',
+      '<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="auth.askSubmit()">确认</button>');
+    auth._onOk=onOk;auth._onCancel=onCancel;
+    setTimeout(()=>{const el=document.getElementById('ask_pwd');if(el)el.focus()},80);
+  },
+  async askSubmit(){
+    const v=(document.getElementById('ask_pwd')||{}).value||'';
+    const err=document.getElementById('ask_err');
+    if(await auth.verify(v)){closeModal();if(auth._onOk)auth._onOk();auth._onOk=auth._onCancel=null}
+    else if(err)err.textContent='密码不正确，请重试';
+  },
+  /* 首次设置密码（弹窗） */
+  askSet(onOk,onCancel){
+    openModal('设置老师密码','<div style="display:grid;gap:12px">'+
+      '<div style="font-size:13px;color:var(--muted)">首次进入老师端，请设置一个密码（至少 4 位）。该密码用于保护课程表 / 作业 / 成绩等管理功能。</div>'+
+      '<input type="password" class="input" id="set_pwd" placeholder="设置密码" autocomplete="off">'+
+      '<input type="password" class="input" id="set_pwd2" placeholder="确认密码" autocomplete="off">'+
+      '<div class="lock-err" id="ask_err"></div></div>',
+      '<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="auth.setSubmit()">保存并进入</button>');
+    auth._onOk=onOk;auth._onCancel=onCancel;
+    setTimeout(()=>{const el=document.getElementById('set_pwd');if(el)el.focus()},80);
+  },
+  async setSubmit(){
+    const a=(document.getElementById('set_pwd')||{}).value||'';
+    const b=(document.getElementById('set_pwd2')||{}).value||'';
+    const err=document.getElementById('ask_err');
+    if(a.length<4){if(err)err.textContent='密码至少 4 位';return}
+    if(a!==b){if(err)err.textContent='两次输入不一致';return}
+    await auth.setPwd(a);auth.unlock();closeModal();
+    if(auth._onOk)auth._onOk();auth._onOk=auth._onCancel=null;
+  },
+  /* 加载页锁定层 */
+  _locked:false,
+  lockShow(mode){
+    auth._locked=true;
+    const mask=document.getElementById('lockMask');
+    const set=mode==='set';
+    document.getElementById('lockTitle').textContent=set?'首次使用 · 设置老师密码':'老师端已加密';
+    document.getElementById('lockTip').textContent=set?'请设置老师密码（至少 4 位），用于保护管理功能':'请输入老师密码以继续';
+    document.getElementById('lockBtn').textContent=set?'保存并进入':'解锁';
+    const p2=document.getElementById('lockPwd2');p2.style.display=set?'':'none';
+    document.getElementById('lockPwd').value='';p2.value='';
+    document.getElementById('lockErr').textContent='';
+    mask.classList.add('show');
+    setTimeout(()=>document.getElementById('lockPwd').focus(),100);
+  },
+  async lockSubmit(){
+    const v=document.getElementById('lockPwd').value||'';
+    const err=document.getElementById('lockErr');
+    if(auth._lockMode==='set'||!auth.has()){
+      const b=document.getElementById('lockPwd2').value||'';
+      if(v.length<4){err.textContent='密码至少 4 位';return}
+      if(v!==b){err.textContent='两次输入不一致';return}
+      await auth.setPwd(v);auth.unlock();
+      document.getElementById('lockMask').classList.remove('show');auth._locked=false;
+      toast('老师密码已设置');
+      return;
+    }
+    if(await auth.verify(v)){
+      auth.unlock();
+      document.getElementById('lockMask').classList.remove('show');auth._locked=false;
+      toast('欢迎回来，老师');
+    }else{err.textContent='密码不正确，请重试';document.getElementById('lockPwd').value=''}
+  },
+  lockExit(){
+    document.getElementById('lockMask').classList.remove('show');auth._locked=false;
+    sessionStorage.setItem(ROLE_UNLOCK_KEY,'0');
+    finishRole('student');
+  }
+};
+function checkLock(){
+  if(currentRole!=='teacher')return;
+  if(auth.unlocked())return;
+  auth._lockMode=auth.has()?'verify':'set';
+  auth.lockShow(auth._lockMode);
+}
+function finishRole(r){
   currentRole=r;DB.set(DB.roleKey,r);
   document.getElementById('roleSelect').value=r;
   document.getElementById('roleIcon').textContent=ROLE_META[r].icon;
   applyRoleUI();updateGreeting();renderAll();
   toast(`已切换到${ROLE_META[r].name}端`);
 }
+async function setRole(r){
+  if(r==='teacher'&&!auth.unlocked()){
+    if(auth.has())auth.ask(()=>{auth.unlock();finishRole('teacher')},()=>{document.getElementById('roleSelect').value=currentRole});
+    else auth.askSet(()=>{auth.unlock();finishRole('teacher')},()=>{document.getElementById('roleSelect').value=currentRole});
+    setTimeout(()=>{document.getElementById('roleSelect').value=currentRole},0);
+    return;
+  }
+  finishRole(r);
+}
 function applyRoleUI(){
   const isTeacher = currentRole==='teacher';
-  const hwAdd=document.getElementById('hwAddBtn');if(hwAdd)hwAdd.style.display=isTeacher?'':'none';
-  const noticeAdd=document.getElementById('noticeAddBtn');if(noticeAdd)noticeAdd.style.display=isTeacher?'':'none';
-  const schedAdd=document.querySelector('#view-schedule .btn-primary');if(schedAdd)schedAdd.style.display=isTeacher?'':'none';
-  const gradeAdd=document.querySelector('#view-grades .btn-primary');if(gradeAdd)gradeAdd.style.display=isTeacher?'':'none';
+  const toggle=(el,show)=>{if(el)el.style.display=show?'':'none'};
+  toggle(document.getElementById('hwAddBtn'),isTeacher);
+  toggle(document.getElementById('noticeAddBtn'),isTeacher);
+  toggle(document.querySelector('#view-schedule .btn-primary'),isTeacher);
+  toggle(document.querySelector('#view-grades .btn-primary'),isTeacher);
+  toggle(document.getElementById('hintSchedule'),!isTeacher);
+  toggle(document.getElementById('hintHomework'),!isTeacher);
+  toggle(document.getElementById('hintGrades'),!isTeacher);
+  const rt=document.getElementById('roleSelect');
+  if(rt)rt.title=isTeacher?'老师端：可管理课程表/作业/成绩/通知':'浏览模式：管理功能需老师密码';
 }
-function renderAll(){
-  if(typeof tasks!=='undefined')tasks.render();
-  if(typeof schedule!=='undefined')schedule.render();
-  if(typeof calendar!=='undefined')calendar.render();
-  if(typeof grades!=='undefined')grades.render();
-  if(typeof notes!=='undefined')notes.render();
-  if(typeof countdown!=='undefined')countdown.render();
-  if(typeof dashboard!=='undefined')dashboard.render();
-  if(typeof homework!=='undefined')homework.render();
-  if(typeof notices!=='undefined')notices.render();
-}
+/* 所有模块的渲染入口（统一注册，避免模块未定义时报错） */
+const RENDERERS=[];
+function renderAll(){RENDERERS.forEach(fn=>{try{fn()}catch(e){console.warn('render error',e)}})}
+
 
 /* Same-browser cross-tab sync (fallback / supplement) */
 let bc=null;
@@ -802,21 +922,150 @@ window.addEventListener('storage',(e)=>{
   }
 });
 
-/* 启动 Firebase */
-initFirebase();
+/* ============ GitHub 仓库文件同步引擎 ============ */
+ghSync={
+  cfg:Object.assign({},GH_DEFAULTS,DB.get(GH_CFG_KEY,null)||{}),
+  sha:null, pushTimer:null, pollTimer:null, pushing:false, pulling:false, applying:false, lastPull:0,
+  token(){return DBraw(GH_TOKEN_KEY,'')},
+  setToken(t){DBrawSet(GH_TOKEN_KEY,t||'')},
+  saveCfg(c){this.cfg=Object.assign({},GH_DEFAULTS,c||{});DBrawSet(GH_CFG_KEY,this.cfg)},
+  ready(){return !!(this.cfg.owner&&this.cfg.repo&&this.token())},
+  apiUrl(){
+    const {owner,repo,path,branch}=this.cfg;
+    const qs=[];if(branch)qs.push('ref='+encodeURIComponent(branch));
+    return `https://api.github.com/repos/${owner}/${repo}/contents/${path}?${qs.join('&')}`;
+  },
+  headers(){
+    const h={'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Cache-Control':'no-store'};
+    if(this.token())h['Authorization']='Bearer '+this.token();
+    return h;
+  },
+  start(){
+    if(!this.ready()){setSyncStatus('unconfigured');return}
+    clearInterval(this.pollTimer);
+    this.pull(true);
+    this.pollTimer=setInterval(()=>{if(document.visibilityState==='visible')this.pull()},20000);
+  },
+  stop(){clearInterval(this.pollTimer);this.pollTimer=null;setSyncStatus('unconfigured')},
+  /* 拉取远端 → 远端更新时间更晚则覆盖本地，否则把本地推上去 */
+  async pull(initial){
+    if(!this.ready()||this.pulling)return;
+    this.pulling=true;
+    if(initial)setSyncStatus('syncing');
+    try{
+      const res=await fetch(this.apiUrl()+'&_='+Date.now(),{headers:this.headers(),cache:'no-store'});
+      if(res.status===404){ // 文件不存在 → 创建
+        this.sha=null;this.pulling=false,this.pushing=false;await this.push();return;
+      }
+      if(res.status===401||res.status===403)throw new Error('令牌无效或权限不足');
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      const info=await res.json();
+      this.sha=info.sha;
+      const payload=JSON.parse(this.decode(info.content));
+      this.lastPull=Date.now();
+      if(payload&&payload.data){
+        const remoteAt=+(payload.updatedAt||0);
+        const localAt=+((store._meta&&store._meta.updatedAt)||0);
+        if(remoteAt>localAt)this.apply(payload);
+        else if(localAt>remoteAt)this.push();
+      }
+      setSyncStatus('online');
+    }catch(e){
+      console.warn('同步拉取失败：',e.message);
+      setSyncStatus('offline');
+    }
+    finally{this.pulling=false}
+  },
+  apply(payload){
+    this.applying=true;
+    const localPwd=store.teacherPwd;              // 老师密码仅存本机，不随同步数据覆盖
+    store=Object.assign({},DEFAULT_STORE,payload.data);
+    Object.keys(DEFAULT_STORE).forEach(k=>{if(store[k]===undefined)store[k]=DEFAULT_STORE[k]});
+    store.teacherPwd=localPwd||null;
+    store._meta={updatedAt:+payload.updatedAt||Date.now(),device:payload.device||'remote'};
+    DB.set(DB.key,store);
+    applyTheme();renderAll();updateGreeting();
+    this.applying=false;
+    toast('已同步其他设备的最新数据');
+  },
+  /* 本地改动 → 延迟合并后推送（防抖，避免频繁提交） */
+  schedulePush(){
+    if(!this.ready())return;
+    clearTimeout(this.pushTimer);
+    this.pushTimer=setTimeout(()=>this.push(),1500);
+  },
+  async push(){
+    if(!this.ready()||this.pushing||this.applying)return;
+    this.pushing=true;setSyncStatus('syncing');
+    try{
+      if(!store._meta||!store._meta.updatedAt)store._meta={updatedAt:Date.now(),device:DEVICE_ID};
+      const remoteData=Object.assign({},store);
+      delete remoteData.teacherPwd;              // 老师密码哈希不上传，仅保存在本机
+      const payload={v:1,updatedAt:store._meta.updatedAt,device:store._meta.device||DEVICE_ID,data:remoteData};
+      const body={
+        message:`同步数据 · ${new Date().toLocaleString('zh-CN')}`,
+        content:this.encode(JSON.stringify(payload)),
+        branch:this.cfg.branch||'main'
+      };
+      if(this.sha)body.sha=this.sha;
+      const res=await fetch(`https://api.github.com/repos/${this.cfg.owner}/${this.cfg.repo}/contents/${this.cfg.path}`,{
+        method:'PUT',headers:Object.assign({'Content-Type':'application/json'},this.headers()),body:JSON.stringify(body)
+      });
+      if(res.status===409||res.status===422){ // sha 冲突 → 先拉取再重试
+        this.sha=null;this.pushing=false;await this.pull();return;
+      }
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      const j=await res.json();
+      this.sha=j.content&&j.content.sha;
+      setSyncStatus('online');
+    }catch(e){
+      console.warn('同步推送失败：',e.message);
+      setSyncStatus('offline');
+    }
+    finally{this.pushing=false}
+  },
+  /* 仅用于「测试连接」 */
+  async test(){
+    const res=await fetch(this.apiUrl()+'&_='+Date.now(),{headers:this.headers(),cache:'no-store'});
+    if(res.status===404)return {ok:true,note:'仓库可访问，数据文件将在首次保存时自动创建'};
+    if(res.status===401)throw new Error('令牌无效（401）');
+    if(res.status===403)throw new Error('权限不足或触发限流（403）');
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const info=await res.json();
+    return {ok:true,note:`文件已存在（${info.size||0} 字节，最近提交 ${info.sha.slice(0,7)}）`};
+  },
+  /* Unicode 安全的 base64 编解码 */
+  encode(str){return btoa(unescape(encodeURIComponent(str)))},
+  decode(b64){
+    const bin=atob(String(b64||'').replace(/\s/g,''));
+    const bytes=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  },
+  disconnect(){
+    this.stop();
+    DBrawSet(GH_TOKEN_KEY,'');
+    this.sha=null;
+  }
+};
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ghSync.ready())ghSync.pull()});
+
+/* 启动同步 */
+ghSync.start();
 
 /* ============ Navigation ============ */
+function navTo(v){
+  document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active',i.dataset.view===v));
+  document.querySelectorAll('.view').forEach(s=>s.classList.remove('active'));
+  const sec=document.getElementById('view-'+v);if(sec)sec.classList.add('active');
+  document.getElementById('sidebar').classList.remove('open');
+  if(v==='stats')setTimeout(()=>{try{stats.render()}catch(e){}},50);
+  if(v==='grades')setTimeout(()=>{try{grades.render()}catch(e){}},50);
+  window.scrollTo(0,0);
+}
 document.getElementById('nav').addEventListener('click',e=>{
   const item=e.target.closest('.nav-item');if(!item)return;
-  document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
-  item.classList.add('active');
-  const v=item.dataset.view;
-  document.querySelectorAll('.view').forEach(s=>s.classList.remove('active'));
-  document.getElementById('view-'+v).classList.add('active');
-  document.getElementById('sidebar').classList.remove('open');
-  if(v==='stats')setTimeout(stats.render,50);
-  if(v==='grades')setTimeout(grades.render,50);
-  window.scrollTo(0,0);
+  navTo(item.dataset.view);
 });
 document.getElementById('menuBtn').onclick=()=>document.getElementById('sidebar').classList.toggle('open');
 
@@ -838,12 +1087,24 @@ document.getElementById('roleSelect').addEventListener('change',e=>setRole(e.tar
 function applyTheme(){
   document.documentElement.classList.toggle('dark',store.theme==='dark');
 }
+function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()||'#888'}
+function chartTheme(){return {muted:cssv('--muted')||'#888',border:cssv('--border')||'#e7e5ef'}}
+function refreshCharts(){
+  if(document.getElementById('view-stats').classList.contains('active'))stats.render();
+  if(document.getElementById('view-grades').classList.contains('active'))grades.render();
+}
 applyTheme();
-document.getElementById('themeBtn').onclick=()=>{store.theme=store.theme==='dark'?'light':'dark';save();applyTheme()};
+document.getElementById('themeBtn').onclick=()=>{
+  store.theme=store.theme==='dark'?'light':'dark';
+  applyTheme();save();refreshCharts();
+};
 
 /* Export / Import */
 document.getElementById('exportBtn').onclick=()=>{
-  const blob=new Blob([JSON.stringify(store,null,2)],{type:'application/json'});
+  const clean=JSON.parse(JSON.stringify(store));
+  delete clean.teacherPwd;   // 密码哈希不随备份导出
+  delete clean._meta;
+  const blob=new Blob([JSON.stringify(clean,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`zhixueyun-${todayStr()}.json`;a.click();
   toast('数据已导出');
 };
@@ -851,94 +1112,110 @@ document.getElementById('importBtn').onclick=()=>document.getElementById('import
 document.getElementById('importFile').onchange=(e)=>{
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
-  r.onload=()=>{try{store=JSON.parse(r.result);save();location.reload()}catch(err){toast('导入失败：文件格式错误')}};
+  r.onload=()=>{
+    try{
+      const data=JSON.parse(r.result);
+      const pwd=store.teacherPwd;   // 保留本机已设置的老师密码
+      store=Object.assign({},DEFAULT_STORE,data);
+      Object.keys(DEFAULT_STORE).forEach(k=>{if(store[k]===undefined)store[k]=DEFAULT_STORE[k]});
+      store.teacherPwd=pwd;
+      save();applyTheme();renderAll();updateGreeting();
+      toast('数据已导入');
+    }catch(err){toast('导入失败：文件格式错误')}
+  };
   r.readAsText(f);
 };
 
-/* Sync Settings - Firebase config via UI */
-const SYNC_CFG_KEY='zhixueyun_fbcfg';
-document.getElementById('syncBtn').onclick=()=>{
-  const saved=DB.get(SYNC_CFG_KEY, null);
-  const cfg = saved || FB_CFG;
-  const statusText = FB_ENABLED 
-    ? (fbConnected ? '<span style="color:var(--success)">● 已连接 · 实时同步中</span>' : '<span style="color:var(--warn)">● 连接中...</span>')
-    : '<span style="color:var(--muted)">● 未配置 · 仅本地存储</span>';
-  openModal('同步设置',`
-    <div style="display:grid;gap:12px">
-      <div style="font-size:13px;line-height:1.7;background:var(--surface-2);padding:12px;border-radius:10px">
-        <div style="font-weight:700;margin-bottom:6px">当前状态：${statusText}</div>
-        配置 Firebase 后，老师/学生/家长三端数据将实时同步（老师布置作业 → 学生家长立即看到）。
-      </div>
-      <details style="font-size:12px;color:var(--muted);line-height:1.7">
-        <summary style="cursor:pointer;font-weight:600">📋 如何获取 Firebase 配置（3步）</summary>
-        <div style="margin-top:8px;padding-left:4px">
-          1. 打开 <b>console.firebase.google.com</b>，点击「添加项目」<br>
-          2. 项目创建后，点击「</>」添加 Web 应用，复制配置对象<br>
-          3. 在左侧「构建 → Realtime Database」创建数据库，规则选择「测试模式」<br>
-          4. 把配置粘贴到下方，点击保存即可
-        </div>
-      </details>
-      <div>
-        <label class="lbl">apiKey</label>
-        <input class="input" id="fb_apiKey" value="${cfg.apiKey||''}">
-      </div>
-      <div>
-        <label class="lbl">authDomain</label>
-        <input class="input" id="fb_authDomain" value="${cfg.authDomain||''}">
-      </div>
-      <div>
-        <label class="lbl">databaseURL</label>
-        <input class="input" id="fb_databaseURL" value="${cfg.databaseURL||''}" placeholder="https://xxx-default-rtdb.firebaseio.com">
-      </div>
-      <div>
-        <label class="lbl">projectId</label>
-        <input class="input" id="fb_projectId" value="${cfg.projectId||''}">
-      </div>
-      <div>
-        <label class="lbl">storageBucket</label>
-        <input class="input" id="fb_storageBucket" value="${cfg.storageBucket||''}">
-      </div>
-      <div>
-        <label class="lbl">messagingSenderId</label>
-        <input class="input" id="fb_messagingSenderId" value="${cfg.messagingSenderId||''}">
-      </div>
-      <div>
-        <label class="lbl">appId</label>
-        <input class="input" id="fb_appId" value="${cfg.appId||''}">
-      </div>
-    </div>`,
-    `<button class="btn btn-ghost" onclick="closeModal()">取消</button>
-     <button class="btn btn-ghost" onclick="syncSettings.clear()">清除配置</button>
-     <button class="btn btn-primary" onclick="syncSettings.save()">保存并启用</button>`);
-};
+/* ============ 同步与设置（GitHub 仓库同步 + 老师端密码） ============ */
 const syncSettings={
-  save(){
-    const cfg={
-      apiKey:document.getElementById('fb_apiKey').value.trim(),
-      authDomain:document.getElementById('fb_authDomain').value.trim(),
-      databaseURL:document.getElementById('fb_databaseURL').value.trim(),
-      projectId:document.getElementById('fb_projectId').value.trim(),
-      storageBucket:document.getElementById('fb_storageBucket').value.trim(),
-      messagingSenderId:document.getElementById('fb_messagingSenderId').value.trim(),
-      appId:document.getElementById('fb_appId').value.trim()
-    };
-    if(!cfg.apiKey||!cfg.databaseURL){toast('请至少填写 apiKey 和 databaseURL');return}
-    DB.set(SYNC_CFG_KEY, cfg);
-    window.FIREBASE_CONFIG=cfg;
-    toast('配置已保存，正在连接...');
-    closeModal();
-    // 重新加载以初始化 Firebase
-    setTimeout(()=>location.reload(),800);
+  open(){
+    const c=ghSync.cfg, token=ghSync.token();
+    const status=ghSync.ready()
+      ? '<span style="color:var(--success)">● 已开启 · 每 20 秒自动拉取</span>'
+      : '<span style="color:var(--muted)">● 未开启 · 仅本地存储</span>';
+    openModal('同步与设置',`
+      <div style="display:grid;gap:14px">
+        <div style="font-size:13px;line-height:1.7;background:var(--surface-2);padding:12px;border-radius:10px">
+          <div style="font-weight:700;margin-bottom:6px">当前状态：${status}</div>
+          数据保存在 GitHub 仓库的一个 JSON 文件里，老师 / 学生 / 家长各端读写同一文件即可同步。
+        </div>
+        <details style="font-size:12px;color:var(--muted);line-height:1.7">
+          <summary style="cursor:pointer;font-weight:600">📋 如何开启同步（3 步）</summary>
+          <div style="margin-top:8px;padding-left:4px">
+            1. 打开 <b>github.com/settings/tokens</b> 生成一个 Personal access token（勾选 <b>repo</b> 权限）<br>
+            2. 填入下方仓库信息（默认已填当前站点仓库），令牌粘贴到 Token 输入框<br>
+            3. 点击「保存并同步」，之后各设备打开页面会自动同步
+          </div>
+        </details>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label class="lbl">仓库所有者 owner</label><input class="input" id="gh_owner" value="${esc(c.owner||'')}"></div>
+          <div><label class="lbl">仓库名 repo</label><input class="input" id="gh_repo" value="${esc(c.repo||'')}"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label class="lbl">分支 branch</label><input class="input" id="gh_branch" value="${esc(c.branch||'main')}"></div>
+          <div><label class="lbl">数据文件路径</label><input class="input" id="gh_path" value="${esc(c.path||'data.json')}"></div>
+        </div>
+        <div>
+          <label class="lbl">访问令牌 Token</label>
+          <input class="input" id="gh_token" type="password" value="${esc(token)}" placeholder="ghp_... / github_pat_..." autocomplete="off">
+          <div style="font-size:11px;color:var(--muted);margin-top:5px">令牌只保存在本设备浏览器，不会随同步数据上传，请勿在公共设备填写。</div>
+        </div>
+        <div id="gh_result" style="font-size:12px;color:var(--muted)"></div>
+        <div style="border-top:1px solid var(--border);padding-top:14px">
+          <div style="font-weight:700;font-size:13px;margin-bottom:6px">老师端密码</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:10px">当前：${auth.has()?'<span style="color:var(--success)">已设置</span>（进入老师端需验证）':'<span style="color:var(--warn)">未设置</span>（进入老师端时会要求设置）'}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <input class="input" id="pwd_new" type="password" placeholder="新密码（≥4 位）" style="flex:1;min-width:150px" autocomplete="off">
+            <button class="btn btn-ghost btn-sm" onclick="syncSettings.setPwd()">保存密码</button>
+            ${auth.has()?'<button class="btn btn-ghost btn-sm" onclick="syncSettings.clearPwd()">清除密码</button>':''}
+          </div>
+        </div>
+      </div>`,
+      `<button class="btn btn-ghost" onclick="closeModal()">关闭</button>
+       <button class="btn btn-ghost" onclick="syncSettings.test()">测试连接</button>
+       <button class="btn btn-primary" onclick="syncSettings.save()">保存并同步</button>`);
   },
-  clear(){
-    if(confirm('确定清除同步配置？将回到本地模式。')){
-      DB.set(SYNC_CFG_KEY, null);
-      closeModal();
-      toast('已清除，刷新后生效');
-      setTimeout(()=>location.reload(),600);
-    }
+  read(){
+    return {
+      owner:document.getElementById('gh_owner').value.trim(),
+      repo:document.getElementById('gh_repo').value.trim(),
+      branch:document.getElementById('gh_branch').value.trim()||'main',
+      path:document.getElementById('gh_path').value.trim()||'data.json'
+    };
+  },
+  save(){
+    const cfg=this.read(), token=document.getElementById('gh_token').value.trim();
+    if(!cfg.owner||!cfg.repo){toast('请填写 owner 和 repo');return}
+    if(!token){toast('请填写访问令牌');return}
+    ghSync.saveCfg(cfg);ghSync.setToken(token);ghSync.sha=null;
+    closeModal();
+    toast('配置已保存，正在连接...');
+    ghSync.start();
+  },
+  async test(){
+    const cfg=this.read(), token=document.getElementById('gh_token').value.trim();
+    const out=document.getElementById('gh_result');
+    if(!cfg.owner||!cfg.repo){out.innerHTML='<span style="color:var(--danger)">请先填写 owner 和 repo</span>';return}
+    if(!token){out.innerHTML='<span style="color:var(--danger)">请先填写访问令牌</span>';return}
+    out.textContent='正在测试连接...';
+    const bCfg=Object.assign({},ghSync.cfg), bTok=ghSync.token();
+    ghSync.cfg=cfg;ghSync.setToken(token);
+    try{const r=await ghSync.test();out.innerHTML=`<span style="color:var(--success)">✓ 连接成功：${esc(r.note)}</span>`}
+    catch(e){out.innerHTML=`<span style="color:var(--danger)">✗ 连接失败：${esc(e.message)}</span>`}
+    ghSync.cfg=bCfg;ghSync.setToken(bTok);
+  },
+  async setPwd(){
+    const v=(document.getElementById('pwd_new')||{}).value||'';
+    if(v.length<4){toast('密码至少 4 位');return}
+    await auth.setPwd(v);auth.unlock();
+    toast('老师密码已更新');closeModal();
+  },
+  clearPwd(){
+    if(!confirm('确定清除老师密码？清除后进入老师端需要重新设置。'))return;
+    auth.clearPwd();auth.unlock();closeModal();toast('已清除老师密码');
   }
 };
+document.getElementById('syncBtn').onclick=()=>syncSettings.open();
 
 /* Modal */
 function openModal(title,bodyHtml,footHtml){
@@ -949,17 +1226,107 @@ function openModal(title,bodyHtml,footHtml){
 }
 function closeModal(){document.getElementById('modalMask').classList.remove('show')}
 document.getElementById('modalMask').onclick=(e)=>{if(e.target.id==='modalMask')closeModal()};
+function submitModal(){const b=document.querySelector('#modalFoot .btn-primary');if(b)b.click()}
+/* ESC 关闭弹窗；Enter 提交（表格内 Ctrl/⌘+Enter 提交） */
+document.addEventListener('keydown',e=>{
+  const lock=document.getElementById('lockMask');
+  if(lock.classList.contains('show')){
+    if(e.key==='Enter'){e.preventDefault();auth.lockSubmit()}
+    return;
+  }
+  const mask=document.getElementById('modalMask');
+  if(!mask.classList.contains('show'))return;
+  if(e.key==='Escape'){e.preventDefault();closeModal();return}
+  if(e.key!=='Enter')return;
+  const t=e.target;
+  if(t&&t.tagName==='TEXTAREA'){if(e.ctrlKey||e.metaKey){e.preventDefault();submitModal()}return}
+  if(t&&t.tagName==='INPUT'){
+    if(t.type==='date'||t.type==='number'||t.type==='file')return;
+    e.preventDefault();submitModal();
+  }
+});
 
 /* Quick add */
 document.getElementById('quickAddBtn').onclick=()=>tasks.openModal();
 
-/* Global search */
-document.getElementById('globalSearch').addEventListener('input',e=>{
-  if(document.getElementById('view-tasks').classList.contains('active')){
-    document.getElementById('taskSearch').value=e.target.value;
-    tasks.render();
+/* ============ 全局搜索（任务 / 作业 / 笔记 / 通知） ============ */
+const search={
+  timer:null,
+  q(){return document.getElementById('globalSearch').value.trim()},
+  close(){
+    const p=document.getElementById('searchPanel');
+    if(!p)return;
+    p.classList.remove('show');p.innerHTML='';
+  },
+  run(){
+    const q=this.q().toLowerCase();
+    const panel=document.getElementById('searchPanel');
+    if(!q){this.close();return}
+    const rx=new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');
+    const hl=s=>esc(s).replace(rx,m=>`<mark>${m}</mark>`);
+    const hit=(s)=>(s||'').toLowerCase().includes(q);
+    const groups=[]; let list=[];
+    store.tasks.forEach(t=>{if(hit(t.title+' '+(t.desc||'')+' '+(t.category||'')))list.push({type:'tasks',icon:'✅',id:t.id,title:t.title,sub:[t.category,t.desc].filter(Boolean).join(' · ')})});
+    if(list.length)groups.push(['任务',list]); list=[];
+    store.homework.forEach(h=>{if(hit(h.title+' '+(h.desc||'')+' '+(h.subject||'')))list.push({type:'homework',icon:'📚',id:h.id,title:h.title,sub:[h.subject,h.desc].filter(Boolean).join(' · ')})});
+    if(list.length)groups.push(['作业',list]); list=[];
+    store.notes.forEach(n=>{if(hit((n.title||'')+' '+(n.body||'')))list.push({type:'notes',icon:'📝',id:n.id,title:n.title||'无标题',sub:(n.body||'').slice(0,70)})});
+    if(list.length)groups.push(['笔记',list]); list=[];
+    store.notices.forEach(n=>{if(hit((n.title||'')+' '+(n.content||'')))list.push({type:'notices',icon:'🔔',id:n.id,title:n.title,sub:(n.content||'').slice(0,70)})});
+    if(list.length)groups.push(['通知',list]);
+    if(!groups.length){
+      panel.innerHTML='<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px">未找到匹配结果</div>';
+      panel.classList.add('show');return;
+    }
+    panel.innerHTML=groups.map(([name,items])=>
+      `<div class="search-group">${name}</div>`+
+      items.slice(0,5).map(it=>`<div class="search-item" onclick="search.go('${it.type}','${it.id}')">
+        <div class="ic2">${it.icon}</div>
+        <div style="min-width:0;flex:1"><span class="t">${hl(it.title)}</span>${it.sub?`<span class="s">${hl(it.sub)}</span>`:''}</div>
+      </div>`).join('')
+    ).join('');
+    panel.classList.add('show');
+  },
+  go(view,id){
+    const q=this.q();
+    document.getElementById('globalSearch').value='';
+    this.close();
+    if(view==='tasks'){
+      navTo('tasks');
+      const box=document.getElementById('taskSearch');
+      if(box){box.value=q}
+      tasks.filter='all';
+      document.querySelectorAll('#view-tasks .chip').forEach(x=>x.classList.toggle('active',x.dataset.filter==='all'));
+      tasks.render();
+    }else if(view==='notes'){
+      navTo('notes');notes.openModal(id);
+    }else{
+      navTo(view);
+      this.flash(view==='homework'?'hwList':'noticeList',id);
+    }
+  },
+  flash(containerId,id){
+    const box=document.getElementById(containerId);
+    if(!box)return;
+    const el=box.querySelector(`[data-id="${id}"]`);
+    if(!el)return;
+    el.scrollIntoView({behavior:'smooth',block:'center'});
+    el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');
   }
-});
+};
+(function(){
+  const gs=document.getElementById('globalSearch');
+  gs.addEventListener('input',()=>{clearTimeout(search.timer);search.timer=setTimeout(()=>search.run(),160)});
+  gs.addEventListener('focus',()=>{if(search.q())search.run()});
+  gs.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){search.close();gs.blur()}
+    if(e.key==='Enter'){const first=document.querySelector('#searchPanel .search-item');if(first){e.preventDefault();first.click()}}
+  });
+  document.addEventListener('click',e=>{
+    const wrap=document.getElementById('searchWrap');
+    if(wrap&&!wrap.contains(e.target))search.close();
+  });
+})();
 
 /* ============ Tasks Module ============ */
 const tasks={
@@ -1137,6 +1504,12 @@ const schedule={
 /* ============ Homework Module ============ */
 const homework={
   subject:'',status:'',
+  stat(h){
+    const items=h.items||[];
+    const total=items.length||1;
+    const done=items.length?items.filter(i=>i.done).length:(h.done?1:0);
+    return {items,total,done,allDone:done>=total,pct:Math.round(done/total*100)};
+  },
   render(){
     const list=[...store.homework].sort((a,b)=>(b.due||'').localeCompare(a.due||''));
     // subject filter options
@@ -1144,35 +1517,52 @@ const homework={
     const subSel=document.getElementById('hwSubjectFilter');
     if(subSel)subSel.innerHTML='<option value="">全部科目</option>'+Object.keys(subs).map(s=>`<option value="${s}" ${this.subject===s?'selected':''}>${s}</option>`).join('');
     // count pending for badge
-    const pending=store.homework.filter(h=>!h.done&&(h.due>=todayStr()||!h.due)).length;
+    const pending=store.homework.filter(h=>!this.stat(h).allDone).length;
     const bc=document.getElementById('hwCount');if(bc)bc.textContent=pending;
+    // role permission
+    const canManage=currentRole==='teacher';
+    const canCheck=currentRole==='student'||currentRole==='teacher';
+    const tick='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
+    const tickSm='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><path d="M20 6L9 17l-5-5"/></svg>';
     // filter
     let filtered=list.filter(h=>{
+      const allDone=this.stat(h).allDone;
       if(this.subject&&h.subject!==this.subject)return false;
-      if(this.status==='pending'&&h.done)return false;
-      if(this.status==='done'&&!h.done)return false;
-      if(this.status==='overdue'&&(h.done||!h.due||h.due>=todayStr()))return false;
+      if(this.status==='pending'&&allDone)return false;
+      if(this.status==='done'&&!allDone)return false;
+      if(this.status==='overdue'&&(allDone||!h.due||h.due>=todayStr()))return false;
       return true;
     });
     const el=document.getElementById('hwList');
     if(filtered.length===0){el.innerHTML='<div class="card card-pad empty"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg><div>暂无作业</div></div>';return}
     el.innerHTML=filtered.map(h=>{
-      const overdue=!h.done&&h.due&&h.due<todayStr();
-      const canEdit=currentRole==='teacher';
-      const canToggle=currentRole==='student'||currentRole==='teacher';
-      return `<div class="task-item ${h.done?'done':''}">
-        <div class="check ${h.done?'checked':''}" ${canToggle?`onclick="homework.toggle('${h.id}')"`:''}>${h.done?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>':''}</div>
+      const {items,total,done,allDone,pct}=this.stat(h);
+      const overdue=!allDone&&h.due&&h.due<todayStr();
+      const itemHtml=items.length?`<div class="hw-items">${items.map(it=>`
+          <div class="hw-item ${it.done?'done':''} ${canCheck?'clickable':''}" ${canCheck?`onclick="homework.toggleItem('${h.id}','${it.id}')"`:''}>
+            <div class="box">${it.done?tickSm:''}</div>
+            <div class="txt">${esc(it.text)}</div>
+          </div>`).join('')}</div>`:'';
+      const checkHtml=items.length?'':`<div class="check ${h.done?'checked':''}" ${canCheck?`onclick="homework.toggle('${h.id}')"`:''}>${h.done?tick:''}</div>`;
+      return `<div class="task-item ${allDone?'done':''}" data-id="${h.id}">
+        ${checkHtml}
         <div class="task-body">
-          <div class="task-title">${h.title}</div>
-          <div class="task-meta">
-            <span class="tag tag-cat">${h.subject||'未分类'}</span>
-            ${h.due?`<span>📅 截止 ${fmtDate(h.due)}${overdue?' <span style="color:var(--danger)">已逾期</span>':''}</span>`:''}
-            <span>👨‍🏫 ${h.teacher||'—'}</span>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <div class="task-title ${allDone?'line':''}">${esc(h.title)}</div>
+            ${allDone?'<span class="done-flag">✅ 全部完成</span>':''}
+            <span class="prog-text" style="margin-left:auto">${done}/${total}</span>
           </div>
-          ${h.desc?`<div style="font-size:12px;color:var(--muted);margin-top:4px">${h.desc}</div>`:''}
+          <div class="task-meta">
+            <span class="tag tag-cat">${esc(h.subject||'未分类')}</span>
+            ${h.due?`<span>📅 截止 ${fmtDate(h.due)}${overdue?' <span style="color:var(--danger)">已逾期</span>':''}</span>`:''}
+            <span>👨‍🏫 ${esc(h.teacher||'—')}</span>
+          </div>
+          ${h.desc?`<div style="font-size:12px;color:var(--muted);margin-top:4px">${esc(h.desc)}</div>`:''}
+          <div class="progress ${allDone?'done':''}"><i style="width:${pct}%"></i></div>
+          ${itemHtml}
         </div>
         <div class="task-actions">
-          ${canEdit?`<button onclick="homework.openModal('${h.id}')" title="编辑"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          ${canManage?`<button onclick="homework.openModal('${h.id}')" title="编辑"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
           <button onclick="homework.del('${h.id}')" title="删除"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>`:''}
         </div>
       </div>`;
@@ -1180,15 +1570,21 @@ const homework={
   },
   openModal(id){
     if(currentRole!=='teacher'){toast('仅老师可布置作业');return}
-    const h=id?store.homework.find(x=>x.id===id):{title:'',desc:'',subject:'',due:'',teacher:''};
+    const h=id?store.homework.find(x=>x.id===id):{title:'',desc:'',subject:'',due:'',teacher:'',items:[]};
+    const itemsText=(h.items||[]).map(i=>i.text).join('\n');
     openModal(id?'编辑作业':'布置作业',`
       <div style="display:grid;gap:12px">
-        <div><label class="lbl">作业标题</label><input class="input" id="h_title" value="${h.title||''}" placeholder="如：第三章习题 1-15"></div>
-        <div><label class="lbl">科目</label><input class="input" id="h_subject" value="${h.subject||''}" placeholder="如：高等数学"></div>
-        <div><label class="lbl">描述</label><textarea class="textarea" id="h_desc">${h.desc||''}</textarea></div>
+        <div><label class="lbl">作业标题</label><input class="input" id="h_title" value="${esc(h.title||'')}" placeholder="如：第三章习题"></div>
+        <div><label class="lbl">科目</label><input class="input" id="h_subject" value="${esc(h.subject||'')}" placeholder="如：高等数学"></div>
+        <div><label class="lbl">描述</label><textarea class="textarea" id="h_desc">${esc(h.desc||'')}</textarea></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div><label class="lbl">截止日期</label><input type="date" class="input" id="h_due" value="${h.due||''}"></div>
-          <div><label class="lbl">授课教师</label><input class="input" id="h_teacher" value="${h.teacher||''}" placeholder="如：王教授"></div>
+          <div><label class="lbl">授课教师</label><input class="input" id="h_teacher" value="${esc(h.teacher||'')}" placeholder="如：王教授"></div>
+        </div>
+        <div>
+          <label class="lbl">完成条目（每行一条，学生逐条勾选）</label>
+          <textarea class="textarea" id="h_items" style="min-height:104px" placeholder="每行一条，例如：&#10;习题 1-5&#10;习题 6-10&#10;整理错题">${esc(itemsText)}</textarea>
+          <div style="font-size:11px;color:var(--muted);margin-top:5px">留空则按「整份作业」单一勾选；填写后学生逐条勾选，全部勾选才显示 ✅。</div>
         </div>
       </div>`,
       `<button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="homework.save('${id||''}')">保存</button>`);
@@ -1202,11 +1598,35 @@ const homework={
       teacher:document.getElementById('h_teacher').value.trim()
     };
     if(!data.title){toast('请填写作业标题');return}
-    if(id){Object.assign(store.homework.find(x=>x.id===id),data)}
-    else{store.homework.push({id:uid(),...data,done:false,createdAt:Date.now()})}
+    const lines=(document.getElementById('h_items').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+    if(id){
+      const h=store.homework.find(x=>x.id===id);
+      const hadItems=(h.items||[]).length>0;
+      const prev=new Map((h.items||[]).map(it=>[it.text,it]));
+      h.items=lines.map(t=>prev.get(t)||{id:uid(),text:t,done:false});
+      if(h.items.length)h.done=h.items.every(i=>i.done);
+      else if(hadItems)h.done=false;
+      Object.assign(h,data);
+    }else{
+      const items=lines.map(t=>({id:uid(),text:t,done:false}));
+      store.homework.push({id:uid(),...data,items,done:false,createdAt:Date.now()});
+    }
     save();closeModal();homework.render();dashboard.render();toast(id?'已更新':'已布置');
   },
-  toggle(id){const h=store.homework.find(x=>x.id===id);h.done=!h.done;save();homework.render();dashboard.render();toast(h.done?'已完成':'已取消完成')},
+  toggle(id){
+    const h=store.homework.find(x=>x.id===id);if(!h)return;
+    h.done=!h.done;save();homework.render();dashboard.render();
+    toast(h.done?'作业已完成 ✅':'已取消完成');
+  },
+  toggleItem(hid,iid){
+    const h=store.homework.find(x=>x.id===hid);if(!h)return;
+    const it=(h.items||[]).find(i=>i.id===iid);if(!it)return;
+    it.done=!it.done;
+    const left=h.items.filter(i=>!i.done).length;
+    h.done=left===0;
+    save();homework.render();dashboard.render();
+    toast(left===0?'作业已全部完成 ✅':`已完成 ${h.items.length-left}/${h.items.length}`);
+  },
   del(id){if(confirm('确定删除此作业？')){store.homework=store.homework.filter(x=>x.id!==id);save();homework.render();dashboard.render();toast('已删除')}}
 };
 document.getElementById('hwSubjectFilter').addEventListener('change',e=>{homework.subject=e.target.value;homework.render()});
@@ -1224,7 +1644,7 @@ const notices={
     el.innerHTML=list.map(n=>{
       const t=types[n.type]||types.info;
       const canEdit=currentRole==='teacher';
-      return `<div class="task-item" style="${n.read?'':'border-left:3px solid var(--primary)'}">
+      return `<div class="task-item" data-id="${n.id}" style="${n.read?'':'border-left:3px solid var(--primary)'}">
         <div class="task-body">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span class="tag" style="background:color-mix(in srgb,${t[1]} 15%,transparent);color:${t[1]}">${t[0]}</span>
@@ -1356,10 +1776,11 @@ const grades={
     // chart
     const ctx=document.getElementById('gradeChart');
     if(ctx._chart)ctx._chart.destroy();
+    const th=chartTheme();
     ctx._chart=new Chart(ctx,{
       type:'bar',
       data:{labels:g.map(x=>x.name),datasets:[{label:'成绩',data:g.map(x=>x.score),backgroundColor:g.map(x=>x.score>=90?'#10b981':x.score>=60?'#f59e0b':'#ef4444'),borderRadius:6}]},
-      options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,grid:{color:'var(--border)'},ticks:{color:'var(--muted)'}},x:{grid:{display:false},ticks:{color:'var(--muted)'}}}}
+      options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,grid:{color:th.border},ticks:{color:th.muted}},x:{grid:{display:false},ticks:{color:th.muted}}}}
     });
   },
   scoreToGPA(s){s=+s;if(s>=90)return 4.0;if(s>=85)return 3.7;if(s>=82)return 3.3;if(s>=78)return 3.0;if(s>=75)return 2.7;if(s>=72)return 2.3;if(s>=68)return 2.0;if(s>=64)return 1.5;if(s>=60)return 1.0;return 0},
@@ -1507,6 +1928,7 @@ const countdown={
 /* ============ Stats Module ============ */
 const stats={
   render(){
+    const th=chartTheme();
     // last 7 days task completion
     const days=[];const done=[];const created=[];
     for(let i=6;i>=0;i--){
@@ -1520,7 +1942,7 @@ const stats={
     c1._chart=new Chart(c1,{type:'line',data:{labels:days,datasets:[
       {label:'已完成',data:done,borderColor:'#10b981',backgroundColor:'rgba(16,185,129,.15)',fill:true,tension:.3},
       {label:'总数',data:created,borderColor:'#6d5efc',backgroundColor:'rgba(109,94,252,.1)',fill:true,tension:.3}
-    ]},options:{responsive:true,plugins:{legend:{labels:{color:'var(--muted)'}}},scales:{y:{beginAtZero:true,ticks:{color:'var(--muted)'},grid:{color:'var(--border)'}},x:{ticks:{color:'var(--muted)'},grid:{display:false}}}}});
+    ]},options:{responsive:true,plugins:{legend:{labels:{color:th.muted}}},scales:{y:{beginAtZero:true,ticks:{color:th.muted},grid:{color:th.border}},x:{ticks:{color:th.muted},grid:{display:false}}}}});
 
     // focus time
     const focus=[];
@@ -1530,17 +1952,17 @@ const stats={
       focus.push(store.pomoLog.filter(l=>l.date===ds).reduce((s,l)=>s+l.duration,0));
     }
     const c2=document.getElementById('chartFocus');if(c2._chart)c2._chart.destroy();
-    c2._chart=new Chart(c2,{type:'bar',data:{labels:days,datasets:[{label:'分钟',data:focus,backgroundColor:'#f59e0b',borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:'var(--muted)'},grid:{color:'var(--border)'}},x:{ticks:{color:'var(--muted)'},grid:{display:false}}}}});
+    c2._chart=new Chart(c2,{type:'bar',data:{labels:days,datasets:[{label:'分钟',data:focus,backgroundColor:'#f59e0b',borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:th.muted},grid:{color:th.border}},x:{ticks:{color:th.muted},grid:{display:false}}}}});
 
     // category pie
     const cats={};store.tasks.forEach(t=>cats[t.category]=(cats[t.category]||0)+1);
     const c3=document.getElementById('chartCat');if(c3._chart)c3._chart.destroy();
-    c3._chart=new Chart(c3,{type:'doughnut',data:{labels:Object.keys(cats)||['无'],datasets:[{data:Object.values(cats)||[1],backgroundColor:['#6d5efc','#f59e0b','#10b981','#06b6d4','#8b5cf6','#ef4444']}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'var(--muted)'}}}}});
+    c3._chart=new Chart(c3,{type:'doughnut',data:{labels:Object.keys(cats).length?Object.keys(cats):['暂无'],datasets:[{data:Object.keys(cats).length?Object.values(cats):[1],backgroundColor:['#6d5efc','#f59e0b','#10b981','#06b6d4','#8b5cf6','#ef4444']}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:th.muted}}}}});
 
     // priority
-    const pri={high:0,mid:0,low:0};store.tasks.forEach(t=>pri[t.priority]++);
+    const pri={high:0,mid:0,low:0};store.tasks.forEach(t=>{if(pri[t.priority]!==undefined)pri[t.priority]++});
     const c4=document.getElementById('chartPri');if(c4._chart)c4._chart.destroy();
-    c4._chart=new Chart(c4,{type:'polarArea',data:{labels:['高','中','低'],datasets:[{data:[pri.high,pri.mid,pri.low],backgroundColor:['#ef4444','#f59e0b','#10b981']}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'var(--muted)'}}},scales:{r:{ticks:{display:false},grid:{color:'var(--border)'}}}}});
+    c4._chart=new Chart(c4,{type:'polarArea',data:{labels:['高','中','低'],datasets:[{data:[pri.high,pri.mid,pri.low],backgroundColor:['#ef4444','#f59e0b','#10b981']}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:th.muted}}},scales:{r:{ticks:{display:false},grid:{color:th.border}}}}});
   }
 };
 
@@ -1594,13 +2016,17 @@ const dashboard={
 
     // homework
     const dhw=document.getElementById('dashHomework');
-    const pendingHw=store.homework.filter(h=>!h.done).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999')).slice(0,5);
+    const pendingHw=store.homework.filter(h=>!homework.stat(h).allDone).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999')).slice(0,5);
     if(pendingHw.length===0){dhw.innerHTML='<div style="color:var(--muted);text-align:center;padding:16px;font-size:13px">暂无待完成作业 🎉</div>'}
-    else{dhw.innerHTML=pendingHw.map(h=>{const overdue=h.due&&h.due<today;return `
+    else{dhw.innerHTML=pendingHw.map(h=>{const s=homework.stat(h);const overdue=h.due&&h.due<today;return `
       <div class="task-item" style="margin-bottom:6px">
-        <div class="task-body"><div class="task-title">${h.title}</div>
-        <div class="task-meta"><span class="tag tag-cat">${h.subject||'未分类'}</span>${h.due?`<span>📅 ${fmtDate(h.due)}</span>`:''}</div></div>
-        ${overdue?'<span class="tag tag-high">逾期</span>':''}
+        <div class="task-body"><div class="task-title">${esc(h.title)}</div>
+        <div class="task-meta"><span class="tag tag-cat">${esc(h.subject||'未分类')}</span>${h.due?`<span>📅 ${fmtDate(h.due)}</span>`:''}</div>
+        <div class="progress"><i style="width:${s.pct}%"></i></div></div>
+        <div style="text-align:right">
+          <div class="prog-text">${s.done}/${s.total}</div>
+          ${overdue?'<span class="tag tag-high" style="margin-top:4px">逾期</span>':''}
+        </div>
       </div>`}).join('')}
 
     // notices
@@ -1637,15 +2063,20 @@ function seedIfEmpty(){
       {id:uid(),title:'英语四级',date:new Date(Date.now()+86400000*20).toISOString().slice(0,10),desc:'CET-4'},
     ];
     store.homework=[
-      {id:uid(),title:'高等数学第三章习题',subject:'高等数学',desc:'完成教材第三章习题 1-15 题',due:new Date(Date.now()+86400000*2).toISOString().slice(0,10),teacher:'王教授',done:false,createdAt:Date.now()},
-      {id:uid(),title:'英语作文：My Dream',subject:'大学英语',desc:'写一篇 150 词的作文',due:new Date(Date.now()+86400000*5).toISOString().slice(0,10),teacher:'李老师',done:false,createdAt:Date.now()},
-      {id:uid(),title:'线性代数矩阵运算练习',subject:'线性代数',desc:'练习册 P45-P48',due:todayStr(),teacher:'张教授',done:true,createdAt:Date.now()},
+      {id:uid(),title:'高等数学第三章习题',subject:'高等数学',desc:'完成教材第三章习题',due:new Date(Date.now()+86400000*2).toISOString().slice(0,10),teacher:'王教授',done:false,createdAt:Date.now(),
+        items:[{id:uid(),text:'习题 1-5',done:true},{id:uid(),text:'习题 6-10',done:true},{id:uid(),text:'习题 11-15',done:false},{id:uid(),text:'整理错题',done:false}]},
+      {id:uid(),title:'英语作文：My Dream',subject:'大学英语',desc:'写一篇 150 词的作文',due:new Date(Date.now()+86400000*5).toISOString().slice(0,10),teacher:'李老师',done:false,createdAt:Date.now(),
+        items:[{id:uid(),text:'列提纲',done:true},{id:uid(),text:'写初稿',done:false},{id:uid(),text:'检查语法',done:false}]},
+      {id:uid(),title:'线性代数矩阵运算练习',subject:'线性代数',desc:'练习册 P45-P48',due:todayStr(),teacher:'张教授',done:true,createdAt:Date.now(),
+        items:[{id:uid(),text:'P45-P46',done:true},{id:uid(),text:'P47-P48',done:true}]},
     ];
     store.notices=[
       {id:uid(),title:'下周一期中考试安排',content:'各位同学请注意，下周一将进行期中考试，考试时间为上午 9:00-11:00，请提前复习并准时到达考场。',from:'教务处',type:'warning',read:false,createdAt:Date.now()},
       {id:uid(),title:'家长会通知',content:'本周五下午 3:00 在教学楼报告厅召开家长会，请各位家长准时参加。',from:'班主任',type:'info',read:false,createdAt:Date.now()-86400000},
     ];
-    save();
+    // 标记为「初始数据」：连接仓库同步时以远端数据优先
+    store._meta={updatedAt:0,device:DEVICE_ID};
+    DB.set(DB.key,store);
   }
 }
 seedIfEmpty();
@@ -1655,23 +2086,30 @@ document.getElementById('roleSelect').value=currentRole;
 document.getElementById('roleIcon').textContent=ROLE_META[currentRole].icon;
 applyRoleUI();
 
-/* Initial render */
-tasks.render();
-schedule.render();
-calendar.render();
-grades.render();
-notes.render();
-countdown.render();
-dashboard.render();
-homework.render();
-notices.render();
+/* 注册所有模块渲染器 + 首次渲染 */
+RENDERERS.push(
+  ()=>tasks.render(),
+  ()=>schedule.render(),
+  ()=>calendar.render(),
+  ()=>grades.render(),
+  ()=>notes.render(),
+  ()=>countdown.render(),
+  ()=>dashboard.render(),
+  ()=>homework.render(),
+  ()=>notices.render(),
+  ()=>pomodoro.renderLog(),
+  ()=>{if(document.getElementById('view-stats').classList.contains('active'))stats.render()}
+);
+renderAll();
 pomodoro.update();
-pomodoro.renderLog();
+
+/* 老师端密码门：若上次停留在老师端且本会话未解锁，则弹出锁定层 */
+checkLock();
 
 // keep greeting fresh hourly
 setInterval(updateGreeting,3600000);
 // keep countdown & dashboard fresh every minute
-setInterval(()=>{countdown.render();dashboard.render()},60000);
+setInterval(()=>{countdown.render();dashboard.render();homework.render();notices.render()},60000);
 </script>
 </body>
 </html>
