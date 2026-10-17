@@ -1,3 +1,9 @@
+/* 页面版本号 */
+/* 重要：每次修改 app.js 或 style.css 后，必须同步提升各 HTML 中引用的 ?v= 版本号。
+   GitHub Pages 对静态资源返回 cache-control: max-age=14400（4 小时），
+   不加版本号会导致用户浏览器长时间继续运行旧脚本。 */
+const APP_VERSION='5';
+
 /* ============ 同步状态指示 ============ */
 function setSyncStatus(state){
   const dot=document.getElementById('syncDot');
@@ -35,7 +41,7 @@ const DB = {
 };
 const DEFAULT_STORE = {
   tasks:[], schedule:[], grades:[], notes:[], countdowns:[], pomoLog:[], theme:'light',
-  homework:[], notices:[], teacherPwd:null, parentPwd:null, _meta:null
+  homework:[], notices:[], students:[], teacherPwd:null, parentPwd:null, _meta:null
 };
 let store = {...DEFAULT_STORE, ...DB.get(DB.key, {})};
 // 确保所有字段存在
@@ -123,12 +129,89 @@ const auth={
     gotoRole('student');
   }
 };
+/* 返回 true 表示本次弹出了锁定层（需要解锁后才继续） */
 function checkLock(){
-  if(!auth.protected(currentRole))return;
-  if(auth.unlocked(currentRole))return;
+  if(!auth.protected(currentRole))return false;
+  if(auth.unlocked(currentRole))return false;
   auth._afterUnlock=null;
   auth.lockShow(currentRole);
+  return true;
 }
+
+/* ============ 身份：学生登记姓名 / 家长选择学生 ============ */
+const NAME_KEY={student:'zhixueyun_student_name',parent:'zhixueyun_parent_name'};
+const persona={
+  get(r){return DBraw(NAME_KEY[r]||'','')},
+  set(r,v){v=String(v==null?'':v).trim();if(v)DBrawSet(NAME_KEY[r],v);else localStorage.removeItem(NAME_KEY[r])},
+  /* 问候语里显示的身份："张小明同学" / "张小明 的家长" */
+  label(){
+    if(currentRole==='student'){const n=this.get('student');return n?n+'同学':ROLE_META.student.greet}
+    if(currentRole==='parent'){const n=this.get('parent');return n?n+' 的家长':ROLE_META.parent.greet}
+    return ROLE_META.teacher.greet;
+  },
+  studentGate(){if(currentRole==='student'&&!this.get('student'))this.openStudentModal()},
+  parentGate(){if(currentRole==='parent'&&!this.get('parent'))this.openParentModal()},
+  /* 学生首次进入：必须填写姓名才能继续 */
+  openStudentModal(){
+    const cur=this.get('student');
+    openModal('填写你的姓名',`
+      <div style="font-size:13px;line-height:1.7;margin-bottom:12px">首次进入学生端，请填写你的姓名。之后家长端可从学生名单中选择你。</div>
+      <label class="lbl">你的姓名</label>
+      <input class="input" id="personaName" maxlength="12" autocomplete="off" placeholder="例如：张小明" value="${esc(cur)}">
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">姓名保存在本设备，并会加入学生名单（随同步数据共享）供家长端选择。</div>`,
+      `<button class="btn btn-primary" onclick="persona.saveStudent()">进入</button>`,true);
+    setTimeout(()=>{const el=document.getElementById('personaName');if(el)el.focus()},120);
+  },
+  saveStudent(){
+    const el=document.getElementById('personaName');
+    const v=(el?el.value:'').trim();
+    if(!v){toast('请填写姓名');return}
+    this.set('student',v);
+    if(!(store.students||[]).includes(v)){store.students=(store.students||[]).concat(v);save()}
+    closeModal(true);updateGreeting();
+    toast('欢迎，'+v+'同学');
+  },
+  /* 家长进入：必须选择（或填写）孩子姓名才能继续 */
+  openParentModal(){
+    const list=(store.students||[]).slice();
+    this._list=list;                     // 渲染时的名单快照，供 pick() 按下标取用
+    const cur=this.get('parent');
+    const pick=list.length
+      ? `<label class="lbl">学生名单（共 ${list.length} 人，点击选择）</label>
+         <div style="display:flex;flex-wrap:wrap;gap:8px;max-height:190px;overflow:auto">
+           ${list.map((n,i)=>`<button class="btn ${n===cur?'btn-primary':'btn-ghost'} btn-sm" onclick="persona.pick(${i})">${esc(n)}</button>`).join('')}
+         </div>`
+      : `<div style="font-size:12px;color:var(--muted);margin-bottom:10px">学生名单暂时是空的 —— 学生首次进入学生端会自动登记姓名；也可以先在下面手动填写。</div>`;
+    openModal('选择你孩子的姓名',`
+      <div style="font-size:13px;line-height:1.7;margin-bottom:12px">家长端需要先选定你的孩子（学生），确认后即可进入。</div>
+      ${pick}
+      <label class="lbl" style="margin-top:12px">或手动填写学生姓名</label>
+      <input class="input" id="personaName" maxlength="12" autocomplete="off" placeholder="例如：张小明" value="${esc(cur)}">`,
+      `<button class="btn btn-ghost" onclick="persona.openParentModal()">刷新名单</button>
+       <button class="btn btn-primary" onclick="persona.saveParent()">确认进入</button>`,true);
+    setTimeout(()=>{const el=document.getElementById('personaName');if(el)el.focus()},120);
+  },
+  /* 点选名单中的第 i 个学生（按下标 + 渲染时快照，避免把姓名拼进内联事件里出错） */
+  pick(i){
+    const n=(this._list||[])[i];
+    if(!n){toast('名单已更新，请点「刷新名单」');return}
+    this.saveParent(n);
+  },
+  saveParent(name){
+    let v=name;
+    if(v===undefined){const el=document.getElementById('personaName');v=(el?el.value:'')||''}
+    v=String(v||'').trim();
+    if(!v){toast('请选择或填写学生姓名');return}
+    this.set('parent',v);
+    closeModal(true);updateGreeting();
+    toast('已进入：'+v+' 的家长');
+  },
+  /* 设置里修改身份 */
+  change(){
+    if(currentRole==='parent')this.openParentModal();
+    else if(currentRole==='student')this.openStudentModal();
+  }
+};
 /* 端切换：各端独立页面 */
 const ROLE_PAGE={teacher:'teacher.html',student:'student.html',parent:'parent.html'};
 function gotoRole(r){DB.set(DB.roleKey,r);location.href=ROLE_PAGE[r]||'student.html'}
@@ -231,9 +314,12 @@ ghSync={
   apply(payload){
     this.applying=true;
     const tp=store.teacherPwd, pp=store.parentPwd;   // 老师/家长密码仅存本机，不随同步数据覆盖
+    const myStudents=(store.students||[]).slice();   // 本机已登记的学生姓名
     store=Object.assign({},DEFAULT_STORE,payload.data);
     Object.keys(DEFAULT_STORE).forEach(k=>{if(store[k]===undefined)store[k]=DEFAULT_STORE[k]});
     store.teacherPwd=tp||null;store.parentPwd=pp||null;
+    // 学生名单取并集，避免某台设备刚登记的姓名被远端旧数据覆盖丢失
+    store.students=Array.from(new Set([...(store.students||[]),...myStudents]));
     store._meta={updatedAt:+payload.updatedAt||Date.now(),device:payload.device||'remote'};
     DB.set(DB.key,store);
     applyTheme();renderAll();updateGreeting();
@@ -327,7 +413,7 @@ function updateGreeting(){
   let g='你好';
   if(h<6)g='夜深了';else if(h<11)g='早上好';else if(h<14)g='中午好';else if(h<18)g='下午好';else g='晚上好';
   const d=new Date();const w=['日','一','二','三','四','五','六'];
-  const greet=ROLE_META[currentRole].greet;
+  const greet=persona.label();
   document.getElementById('greeting').innerHTML=`${g}，${greet}<small>${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 · 星期${w[d.getDay()]}</small>`;
 }
 updateGreeting();
@@ -412,9 +498,18 @@ const syncSettings={
           </div>
         </div>
         <div style="border-top:1px solid var(--border);padding-top:14px">
+          <div style="font-weight:700;font-size:13px;margin-bottom:8px">当前身份</div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px">
+            <span>${ROLE_META[currentRole].icon} ${esc(persona.label())}</span>
+            ${currentRole==='teacher'?'':`<button class="btn btn-ghost btn-sm" onclick="persona.change()">${currentRole==='student'?'修改姓名':'更改绑定的学生'}</button>`}
+          </div>
+          ${currentRole==='teacher'?`<div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.6">学生名单（${(store.students||[]).length} 人）：${(store.students||[]).map(n=>esc(n)).join('、')||'暂无 —— 学生首次进入学生端时会自动登记'}</div>`:''}
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:14px">
           <div style="font-size:13px;line-height:1.7;background:var(--surface-2);padding:12px;border-radius:10px">
             <div style="font-weight:700;margin-bottom:6px">同步状态：${status}</div>
             数据保存在 GitHub 仓库的一个 JSON 文件里，老师 / 学生 / 家长各端读写同一文件即可同步。
+            <div style="font-size:11px;color:var(--muted);margin-top:6px">页面版本 v${APP_VERSION} · 若与最新版号不符，请强制刷新页面（⌘⇧R / Ctrl+F5）</div>
           </div>
         </div>
         <details style="font-size:12px;color:var(--muted);line-height:1.7">
@@ -487,7 +582,12 @@ const syncSettings={
     const bCfg=Object.assign({},ghSync.cfg), bTok=ghSync.token();
     ghSync.cfg=cfg;ghSync.setToken(token);
     try{const r=await ghSync.test();out.innerHTML=`<span style="color:var(--success)">✓ 连接成功：${esc(r.note)}</span>`}
-    catch(e){out.innerHTML=`<span style="color:var(--danger)">✗ 连接失败：${esc(e.message)}</span>`}
+    catch(e){
+      const m=(e&&e.message)?e.message:String(e);
+      const net=/Failed to fetch|Load failed|NetworkError|network/i.test(m);
+      out.innerHTML=`<span style="color:var(--danger)">✗ 连接失败：${esc(m)}（页面版本 v${APP_VERSION}）</span>`
+        +(net?`<div style="color:var(--muted);margin-top:6px;line-height:1.6">这类报错通常是两种情况：① 浏览器仍在运行缓存的旧脚本 → 强制刷新（⌘⇧R / Ctrl+F5）后重试；② 浏览器或扩展拦截了 api.github.com。若强制刷新后仍失败，请把这一整条报错发我。</div>`:'');
+    }
     ghSync.cfg=bCfg;ghSync.setToken(bTok);
   },
   async setPwd(role){
@@ -511,13 +611,19 @@ document.getElementById('settingsBtn').onclick=()=>syncSettings.open();
 document.getElementById('syncBtn').onclick=()=>syncSettings.open();
 
 /* Modal */
-function openModal(title,bodyHtml,footHtml){
+let modalLocked=false;   // 身份类弹窗必须完成填写才能关闭
+function openModal(title,bodyHtml,footHtml,locked){
   document.getElementById('modalTitle').textContent=title;
   document.getElementById('modalBody').innerHTML=bodyHtml;
   document.getElementById('modalFoot').innerHTML=footHtml;
   document.getElementById('modalMask').classList.add('show');
+  modalLocked=!!locked;
 }
-function closeModal(){document.getElementById('modalMask').classList.remove('show')}
+function closeModal(force){
+  if(modalLocked&&!force)return;
+  modalLocked=false;
+  document.getElementById('modalMask').classList.remove('show');
+}
 document.getElementById('modalMask').onclick=(e)=>{if(e.target.id==='modalMask')closeModal()};
 function submitModal(){const b=document.querySelector('#modalFoot .btn-primary');if(b)b.click()}
 /* ESC 关闭弹窗；Enter 提交（表格内 Ctrl/⌘+Enter 提交） */
@@ -1411,8 +1517,14 @@ RENDERERS.push(
 renderAll();
 pomodoro.update();
 
-/* 老师端密码门：若上次停留在老师端且本会话未解锁，则弹出锁定层 */
-checkLock();
+/* 进入门：老师端 / 家长端需密码；学生端首次进入需登记姓名；家长端解锁后需选择学生 */
+const gatedOut=checkLock();
+if(currentRole==='parent'){
+  if(gatedOut)auth._afterUnlock=()=>persona.parentGate();
+  else persona.parentGate();
+}else{
+  persona.studentGate();
+}
 
 // keep greeting fresh hourly
 setInterval(updateGreeting,3600000);
