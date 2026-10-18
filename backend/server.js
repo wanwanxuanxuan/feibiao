@@ -1,0 +1,268 @@
+/**
+ * AI Browser Agent - Main Server
+ * Handles Express, WebSocket, Playwright browser, and AI agent management
+ */
+
+require('dotenv').config();
+
+const express = require('express');
+const http = require('http');
+const { WebSocketServer } = require('ws');
+const path = require('path');
+const { chromium } = require('playwright');
+const BrowserAgent = require('./agent');
+const { getAvailableModels } = require('./ai-providers');
+
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
+
+const PORT = process.env.PORT || 3000;
+
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
+
+// API endpoint to get available models
+app.get('/api/models', (req, res) => {
+  res.json({ models: getAvailableModels() });
+});
+
+// Browser state
+let browser = null;
+let browserContext = null;
+let page = null;
+let currentAgent = null;
+let viewportSize = { width: 1280, height: 800 };
+
+// Screenshot streaming
+let screenshotInterval = null;
+let latestScreenshot = null;
+let clients = new Set();
+
+async function initBrowser() {
+  if (browser) return;
+
+  console.log('Launching browser...');
+  browser = await chromium.launch({
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+    ]
+  });
+
+  browserContext = await browser.newContext({
+    viewport: viewportSize,
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  });
+
+  page = await browserContext.newPage();
+  page.setDefaultTimeout(15000);
+  page.setDefaultNavigationTimeout(30000);
+
+  page.on('framenavigated', async (frame) => {
+    if (frame === page.mainFrame()) {
+      const url = page.url();
+      const title = await page.title().catch(() => '');
+      broadcast({ type: 'navigation_complete', url, title });
+    }
+  });
+
+  console.log('Browser launched successfully.');
+  await page.goto('about:blank');
+}
+
+function startScreenshotStreaming() {
+  if (screenshotInterval) return;
+
+  screenshotInterval = setInterval(async () => {
+    if (!page || clients.size === 0) return;
+
+    try {
+      const screenshot = await page.screenshot({ type: 'jpeg', quality: 70 });
+      latestScreenshot = screenshot.toString('base64');
+
+      const msg = JSON.stringify({
+        type: 'screenshot',
+        data: latestScreenshot,
+        viewport: viewportSize
+      });
+
+      for (const client of clients) {
+        if (client.readyState === 1) {
+          client.send(msg);
+        }
+      }
+    } catch (e) {}
+  }, 400);
+}
+
+function stopScreenshotStreaming() {
+  if (screenshotInterval) {
+    clearInterval(screenshotInterval);
+    screenshotInterval = null;
+  }
+}
+
+function broadcast(msg) {
+  const data = JSON.stringify(msg);
+  for (const client of clients) {
+    if (client.readyState === 1) {
+      client.send(data);
+    }
+  }
+}
+
+wss.on('connection', (ws) => {
+  console.log('Client connected');
+  clients.add(ws);
+  startScreenshotStreaming();
+
+  ws.send(JSON.stringify({
+    type: 'init',
+    models: getAvailableModels(),
+    viewport: viewportSize,
+    currentUrl: page ? page.url() : 'about:blank',
+  }));
+
+  ws.on('message', async (data) => {
+    let message;
+    try {
+      message = JSON.parse(data.toString());
+      console.log('Received message:', message.type);
+    } catch (e) {
+      console.error('Invalid message:', e.message);
+      return;
+    }
+    await handleMessage(ws, message);
+  });
+
+  ws.on('close', () => {
+    console.log('Client disconnected');
+    clients.delete(ws);
+    if (clients.size === 0) {
+      stopScreenshotStreaming();
+    }
+  });
+});
+
+async function handleMessage(ws, message) {
+  switch (message.type) {
+    case 'navigate': await handleNavigate(ws, message.url); break;
+    case 'click': await handleClick(message.x, message.y); break;
+    case 'type': await handleType(message.text); break;
+    case 'keypress': await handleKeypress(message.key); break;
+    case 'scroll': await handleScroll(message.deltaX, message.deltaY); break;
+    case 'go_back': if (page) await page.goBack().catch(() => {}); break;
+    case 'go_forward': if (page) await page.goForward().catch(() => {}); break;
+    case 'start_agent': await handleStartAgent(ws, message); break;
+    case 'pause_agent': if (currentAgent) currentAgent.pause(); break;
+    case 'resume_agent': if (currentAgent) currentAgent.resume(); break;
+    case 'stop_agent': if (currentAgent) currentAgent.stop(); currentAgent = null; break;
+    case 'answer': if (currentAgent) currentAgent.setAnswer(message.answer); break;
+    case 'set_viewport':
+      if (message.width && message.height) {
+        viewportSize = { width: message.width, height: message.height };
+        if (page) await page.setViewportSize(viewportSize);
+      }
+      break;
+    case 'get_screenshot':
+      if (latestScreenshot) {
+        ws.send(JSON.stringify({ type: 'screenshot', data: latestScreenshot, viewport: viewportSize }));
+      }
+      break;
+    default: console.log('Unknown message type:', message.type);
+  }
+}
+
+async function handleNavigate(ws, url) {
+  if (!page) return;
+  console.log('Navigating to:', url);
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = 'https://' + url;
+  }
+  try {
+    broadcast({ type: 'navigation_start', url });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    broadcast({ type: 'navigation_complete', url: page.url(), title: await page.title() });
+  } catch (e) {
+    broadcast({ type: 'navigation_error', error: e.message, url });
+  }
+}
+
+async function handleClick(x, y) {
+  if (!page) return;
+  console.log(`User click at (${x}, ${y})`);
+  if (currentAgent && currentAgent.running) currentAgent.userIntervened();
+  try { await page.mouse.click(x, y); } catch (e) { console.error('Click error:', e.message); }
+}
+
+async function handleType(text) {
+  if (!page) return;
+  if (currentAgent && currentAgent.running) currentAgent.userIntervened();
+  try { await page.keyboard.type(text, { delay: 20 }); } catch (e) { console.error('Type error:', e.message); }
+}
+
+async function handleKeypress(key) {
+  if (!page) return;
+  if (currentAgent && currentAgent.running) currentAgent.userIntervened();
+  try { await page.keyboard.press(key); } catch (e) { console.error('Keypress error:', e.message); }
+}
+
+async function handleScroll(deltaX, deltaY) {
+  if (!page) return;
+  try { await page.mouse.wheel(deltaX, deltaY); } catch (e) { console.error('Scroll error:', e.message); }
+}
+
+async function handleStartAgent(ws, message) {
+  const { model, apiKey, task } = message;
+
+  if (!model || !apiKey || !task) {
+    ws.send(JSON.stringify({ type: 'agent_error', error: 'Missing model, apiKey, or task' }));
+    return;
+  }
+
+  if (!page) {
+    ws.send(JSON.stringify({ type: 'agent_error', error: 'Browser not initialized' }));
+    return;
+  }
+
+  if (currentAgent) currentAgent.stop();
+
+  try {
+    currentAgent = new BrowserAgent(page, ws, { model, apiKey });
+    broadcast({ type: 'agent_status', status: 'starting' });
+    await currentAgent.start(task);
+  } catch (e) {
+    console.error('Agent start error:', e);
+    ws.send(JSON.stringify({ type: 'agent_error', error: e.message }));
+  }
+}
+
+async function startServer() {
+  try {
+    await initBrowser();
+  } catch (e) {
+    console.error('Failed to launch browser:', e.message);
+    console.log('Server will start without browser. Please install Playwright browsers.');
+  }
+
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n🚀 AI Browser Agent running at http://localhost:${PORT}`);
+    console.log(`   Available models: ${getAvailableModels().length} vision models`);
+    console.log(`   Press Ctrl+C to stop\n`);
+  });
+}
+
+process.on('SIGINT', async () => {
+  console.log('\nShutting down...');
+  stopScreenshotStreaming();
+  if (currentAgent) currentAgent.stop();
+  if (browser) await browser.close();
+  process.exit(0);
+});
+
+startServer();
