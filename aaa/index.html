@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 浏览器代理 - AI Browser Agent</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <header class="top-bar">
+            <div class="logo">
+                <span class="logo-icon">🤖</span>
+                <span class="logo-text">AI 浏览器代理</span>
+            </div>
+            <div class="url-bar">
+                <div class="url-input-wrapper">
+                    <span class="lock-icon">🔒</span>
+                    <input type="text" id="url-input" placeholder="输入网址，例如 https://www.google.com" />
+                </div>
+                <button id="navigate-btn" class="btn btn-primary"><span>前往</span></button>
+                <button id="refresh-btn" class="btn btn-secondary" title="刷新"><span>🔄</span></button>
+            </div>
+            <div class="model-selector">
+                <select id="model-select">
+                    <option value="">选择 AI 模型...</option>
+                </select>
+            </div>
+            <button id="settings-btn" class="btn btn-icon" title="设置 API Key"><span>⚙️</span></button>
+        </header>
+        <main class="main-content">
+            <section class="browser-pane" id="browser-pane">
+                <div class="browser-toolbar">
+                    <div class="browser-status">
+                        <span id="browser-url" class="url-display">about:blank</span>
+                    </div>
+                    <div class="agent-status" id="agent-status">
+                        <span class="status-dot"></span>
+                        <span class="status-text">空闲</span>
+                    </div>
+                    <div class="connection-status" id="connection-status" title="后端连接状态">
+                        <span class="conn-dot"></span>
+                        <span class="conn-text">未连接</span>
+                    </div>
+                </div>
+                <div class="browser-view-wrapper" id="browser-view-wrapper">
+                    <canvas id="browser-canvas"></canvas>
+                    <div class="browser-overlay" id="browser-overlay">
+                        <div class="overlay-content">
+                            <div class="overlay-icon">🌐</div>
+                            <p>在上方输入网址开始浏览</p>
+                            <p class="hint">或让 AI 帮你完成任务</p>
+                        </div>
+                    </div>
+                    <div class="ai-highlight-border" id="ai-border"></div>
+                    <div class="click-indicator" id="click-indicator"></div>
+                </div>
+                <div class="browser-controls">
+                    <button class="control-btn" data-action="back" title="后退">◀</button>
+                    <button class="control-btn" data-action="forward" title="前进">▶</button>
+                    <button class="control-btn" data-action="scroll-up" title="向上滚动">▲</button>
+                    <button class="control-btn" data-action="scroll-down" title="向下滚动">▼</button>
+                    <span class="control-hint">💡 点击页面可直接操作（会暂停 AI）</span>
+                </div>
+            </section>
+            <aside class="control-pane">
+                <div class="task-section">
+                    <h3 class="section-title"><span class="title-icon">🎯</span>任务指令</h3>
+                    <textarea id="task-input" placeholder="告诉 AI 你想让它做什么...&#10;例如：帮我搜索北京天气预报并截图" rows="3"></textarea>
+                    <div class="task-buttons">
+                        <button id="start-agent-btn" class="btn btn-start"><span>🚀 开始 AI 控制</span></button>
+                        <button id="pause-agent-btn" class="btn btn-pause" style="display:none;"><span>⏸ 暂停</span></button>
+                        <button id="resume-agent-btn" class="btn btn-resume" style="display:none;"><span>▶ 继续</span></button>
+                        <button id="stop-agent-btn" class="btn btn-stop" style="display:none;"><span>⏹ 停止</span></button>
+                    </div>
+                </div>
+                <div class="ai-question" id="ai-question" style="display:none;">
+                    <div class="question-header">
+                        <span class="question-icon">❓</span>
+                        <span>AI 需要你的帮助</span>
+                    </div>
+                    <div class="question-text" id="question-text"></div>
+                    <div class="question-input-wrapper">
+                        <input type="text" id="answer-input" placeholder="输入你的回答..." />
+                        <button id="submit-answer-btn" class="btn btn-primary">发送</button>
+                    </div>
+                </div>
+                <div class="thinking-section">
+                    <h3 class="section-title">
+                        <span class="title-icon">💭</span>AI 思考过程
+                        <span class="thinking-indicator" id="thinking-indicator" style="display:none;">
+                            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                        </span>
+                    </h3>
+                    <div class="thinking-log" id="thinking-log">
+                        <div class="thinking-empty">
+                            <p>等待 AI 开始工作...</p>
+                            <p class="hint">输入任务并点击"开始 AI 控制"</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="actions-section">
+                    <h3 class="section-title"><span class="title-icon">⚡</span>操作记录</h3>
+                    <div class="actions-log" id="actions-log">
+                        <div class="actions-empty">暂无操作</div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+    <div class="modal-overlay" id="settings-modal" style="display:none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>API Key 设置</h2>
+                <button class="modal-close" id="close-settings">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-hint">请输入你选择的 AI 模型对应的 API Key。Key 仅保存在本地浏览器中。</p>
+                <div class="api-key-group">
+                    <label>后端服务器地址 (Backend URL)</label>
+                    <input type="text" id="backend-url" placeholder="ws://localhost:3000" />
+                    <small style="color:#888;display:block;margin-top:4px;">前端从 GitHub Pages 加载时，需连接本地运行的后端。默认 ws://localhost:3000</small>
+                </div>
+                <div class="api-key-group">
+                    <label>OpenAI API Key (GPT-4o)</label>
+                    <input type="password" id="api-key-openai" placeholder="sk-..." />
+                </div>
+                <div class="api-key-group">
+                    <label>Google Gemini API Key</label>
+                    <input type="password" id="api-key-google" placeholder="AIza..." />
+                </div>
+                <div class="api-key-group">
+                    <label>智谱 Zhipu API Key (GLM-4V)</label>
+                    <input type="password" id="api-key-zhipu" placeholder="..." />
+                </div>
+                <div class="api-key-group">
+                    <label>通义千问 DashScope API Key (Qwen)</label>
+                    <input type="password" id="api-key-qwen" placeholder="sk-..." />
+                </div>
+                <div class="api-key-group">
+                    <label>Moonshot Kimi API Key</label>
+                    <input type="password" id="api-key-moonshot" placeholder="sk-..." />
+                </div>
+                <div class="api-key-group">
+                    <label>Anthropic Claude API Key</label>
+                    <input type="password" id="api-key-anthropic" placeholder="sk-ant-..." />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="save-settings">保存设置</button>
+            </div>
+        </div>
+    </div>
+    <script src="client.js"></script>
+</body>
+</html>
