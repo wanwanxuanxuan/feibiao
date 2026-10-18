@@ -1,0 +1,16 @@
+{
+  "name": "ai-browser-agent",
+  "version": "1.0.0",
+  "description": "AI Browser Agent - Let AI control a browser with vision capabilities",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0",
+    "playwright": "^1.47.0",
+    "dotenv": "^16.4.5"
+  }
+}
