@@ -40,12 +40,16 @@ let screenshotInterval = null;
 let latestScreenshot = null;
 let clients = new Set();
 
+/**
+ * Initialize the browser
+ */
 async function initBrowser() {
   if (browser) return;
 
   console.log('Launching browser...');
   browser = await chromium.launch({
     headless: true,
+    executablePath: '/root/.cache/puppeteer/chrome/linux-151.0.7922.71/chrome-linux64/chrome',
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -60,9 +64,12 @@ async function initBrowser() {
   });
 
   page = await browserContext.newPage();
+
+  // Set default timeout
   page.setDefaultTimeout(15000);
   page.setDefaultNavigationTimeout(30000);
 
+  // Listen for URL changes (e.g., when user clicks a link)
   page.on('framenavigated', async (frame) => {
     if (frame === page.mainFrame()) {
       const url = page.url();
@@ -72,9 +79,14 @@ async function initBrowser() {
   });
 
   console.log('Browser launched successfully.');
+
+  // Navigate to a default page
   await page.goto('about:blank');
 }
 
+/**
+ * Start streaming screenshots to connected clients
+ */
 function startScreenshotStreaming() {
   if (screenshotInterval) return;
 
@@ -96,10 +108,15 @@ function startScreenshotStreaming() {
           client.send(msg);
         }
       }
-    } catch (e) {}
-  }, 400);
+    } catch (e) {
+      // Ignore screenshot errors
+    }
+  }, 400); // ~2.5 fps, balance between smoothness and performance
 }
 
+/**
+ * Stop streaming screenshots
+ */
 function stopScreenshotStreaming() {
   if (screenshotInterval) {
     clearInterval(screenshotInterval);
@@ -107,6 +124,9 @@ function stopScreenshotStreaming() {
   }
 }
 
+/**
+ * Broadcast a message to all connected clients
+ */
 function broadcast(msg) {
   const data = JSON.stringify(msg);
   for (const client of clients) {
@@ -116,11 +136,15 @@ function broadcast(msg) {
   }
 }
 
+// Handle WebSocket connections
 wss.on('connection', (ws) => {
   console.log('Client connected');
   clients.add(ws);
+
+  // Start streaming if not already
   startScreenshotStreaming();
 
+  // Send current URL and available models
   ws.send(JSON.stringify({
     type: 'init',
     models: getAvailableModels(),
@@ -137,6 +161,7 @@ wss.on('connection', (ws) => {
       console.error('Invalid message:', e.message);
       return;
     }
+
     await handleMessage(ws, message);
   });
 
@@ -144,46 +169,119 @@ wss.on('connection', (ws) => {
     console.log('Client disconnected');
     clients.delete(ws);
     if (clients.size === 0) {
+      // Don't stop the browser, just stop streaming
       stopScreenshotStreaming();
     }
   });
 });
 
+/**
+ * Handle incoming WebSocket messages
+ */
 async function handleMessage(ws, message) {
   switch (message.type) {
-    case 'navigate': await handleNavigate(ws, message.url); break;
-    case 'click': await handleClick(message.x, message.y); break;
-    case 'type': await handleType(message.text); break;
-    case 'keypress': await handleKeypress(message.key); break;
-    case 'scroll': await handleScroll(message.deltaX, message.deltaY); break;
-    case 'go_back': if (page) await page.goBack().catch(() => {}); break;
-    case 'go_forward': if (page) await page.goForward().catch(() => {}); break;
-    case 'start_agent': await handleStartAgent(ws, message); break;
-    case 'pause_agent': if (currentAgent) currentAgent.pause(); break;
-    case 'resume_agent': if (currentAgent) currentAgent.resume(); break;
-    case 'stop_agent': if (currentAgent) currentAgent.stop(); currentAgent = null; break;
-    case 'answer': if (currentAgent) currentAgent.setAnswer(message.answer); break;
+    case 'navigate':
+      await handleNavigate(ws, message.url);
+      break;
+
+    case 'click':
+      await handleClick(message.x, message.y);
+      break;
+
+    case 'type':
+      await handleType(message.text);
+      break;
+
+    case 'keypress':
+      await handleKeypress(message.key);
+      break;
+
+    case 'scroll':
+      await handleScroll(message.deltaX, message.deltaY);
+      break;
+
+    case 'go_back':
+      if (page) await page.goBack().catch(() => {});
+      break;
+
+    case 'go_forward':
+      if (page) await page.goForward().catch(() => {});
+      break;
+
+    case 'start_agent':
+      await handleStartAgent(ws, message);
+      break;
+
+    case 'pause_agent':
+      if (currentAgent) currentAgent.pause();
+      break;
+
+    case 'resume_agent':
+      if (currentAgent) currentAgent.resume();
+      break;
+
+    case 'stop_agent':
+      if (currentAgent) currentAgent.stop();
+      currentAgent = null;
+      break;
+
+    case 'answer':
+      if (currentAgent) currentAgent.setAnswer(message.answer);
+      break;
+
     case 'set_viewport':
       if (message.width && message.height) {
         viewportSize = { width: message.width, height: message.height };
         if (page) await page.setViewportSize(viewportSize);
       }
       break;
+
     case 'get_screenshot':
       if (latestScreenshot) {
-        ws.send(JSON.stringify({ type: 'screenshot', data: latestScreenshot, viewport: viewportSize }));
+        ws.send(JSON.stringify({
+          type: 'screenshot',
+          data: latestScreenshot,
+          viewport: viewportSize
+        }));
       }
       break;
-    default: console.log('Unknown message type:', message.type);
+
+    case 'take_screenshot':
+      if (page) {
+        try {
+          const screenshot = await page.screenshot({ type: 'jpeg', quality: 70 });
+          ws.send(JSON.stringify({
+            type: 'screenshot_taken',
+            data: screenshot.toString('base64'),
+            viewport: viewportSize
+          }));
+        } catch (e) {
+          ws.send(JSON.stringify({ type: 'screenshot_error', error: e.message }));
+        }
+      }
+      break;
+
+    case 'action_done':
+      // Frontend free agent confirms action executed
+      break;
+
+    default:
+      console.log('Unknown message type:', message.type);
   }
 }
 
+/**
+ * Navigate to a URL
+ */
 async function handleNavigate(ws, url) {
   if (!page) return;
+
   console.log('Navigating to:', url);
+  // Add protocol if missing
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
     url = 'https://' + url;
   }
+
   try {
     broadcast({ type: 'navigation_start', url });
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -193,44 +291,90 @@ async function handleNavigate(ws, url) {
   }
 }
 
+/**
+ * Handle user click
+ */
 async function handleClick(x, y) {
   if (!page) return;
   console.log(`User click at (${x}, ${y})`);
-  if (currentAgent && currentAgent.running) currentAgent.userIntervened();
-  try { await page.mouse.click(x, y); } catch (e) { console.error('Click error:', e.message); }
+  if (currentAgent && currentAgent.running) {
+    currentAgent.userIntervened();
+  }
+  try {
+    await page.mouse.click(x, y);
+  } catch (e) {
+    console.error('Click error:', e.message);
+  }
 }
 
+/**
+ * Handle user typing
+ */
 async function handleType(text) {
   if (!page) return;
-  if (currentAgent && currentAgent.running) currentAgent.userIntervened();
-  try { await page.keyboard.type(text, { delay: 20 }); } catch (e) { console.error('Type error:', e.message); }
+  if (currentAgent && currentAgent.running) {
+    currentAgent.userIntervened();
+  }
+  try {
+    await page.keyboard.type(text, { delay: 20 });
+  } catch (e) {
+    console.error('Type error:', e.message);
+  }
 }
 
+/**
+ * Handle key press
+ */
 async function handleKeypress(key) {
   if (!page) return;
-  if (currentAgent && currentAgent.running) currentAgent.userIntervened();
-  try { await page.keyboard.press(key); } catch (e) { console.error('Keypress error:', e.message); }
+  if (currentAgent && currentAgent.running) {
+    currentAgent.userIntervened();
+  }
+  try {
+    await page.keyboard.press(key);
+  } catch (e) {
+    console.error('Keypress error:', e.message);
+  }
 }
 
+/**
+ * Handle scroll
+ */
 async function handleScroll(deltaX, deltaY) {
   if (!page) return;
-  try { await page.mouse.wheel(deltaX, deltaY); } catch (e) { console.error('Scroll error:', e.message); }
+  try {
+    await page.mouse.wheel(deltaX, deltaY);
+  } catch (e) {
+    console.error('Scroll error:', e.message);
+  }
 }
 
+/**
+ * Start the AI agent
+ */
 async function handleStartAgent(ws, message) {
   const { model, apiKey, task } = message;
 
   if (!model || !apiKey || !task) {
-    ws.send(JSON.stringify({ type: 'agent_error', error: 'Missing model, apiKey, or task' }));
+    ws.send(JSON.stringify({
+      type: 'agent_error',
+      error: 'Missing model, apiKey, or task'
+    }));
     return;
   }
 
   if (!page) {
-    ws.send(JSON.stringify({ type: 'agent_error', error: 'Browser not initialized' }));
+    ws.send(JSON.stringify({
+      type: 'agent_error',
+      error: 'Browser not initialized'
+    }));
     return;
   }
 
-  if (currentAgent) currentAgent.stop();
+  // Stop existing agent
+  if (currentAgent) {
+    currentAgent.stop();
+  }
 
   try {
     currentAgent = new BrowserAgent(page, ws, { model, apiKey });
@@ -238,10 +382,14 @@ async function handleStartAgent(ws, message) {
     await currentAgent.start(task);
   } catch (e) {
     console.error('Agent start error:', e);
-    ws.send(JSON.stringify({ type: 'agent_error', error: e.message }));
+    ws.send(JSON.stringify({
+      type: 'agent_error',
+      error: e.message
+    }));
   }
 }
 
+// Start the server
 async function startServer() {
   try {
     await initBrowser();
@@ -250,13 +398,14 @@ async function startServer() {
     console.log('Server will start without browser. Please install Playwright browsers.');
   }
 
-  server.listen(PORT, '0.0.0.0', () => {
+  server.listen(PORT, () => {
     console.log(`\n🚀 AI Browser Agent running at http://localhost:${PORT}`);
     console.log(`   Available models: ${getAvailableModels().length} vision models`);
     console.log(`   Press Ctrl+C to stop\n`);
   });
 }
 
+// Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\nShutting down...');
   stopScreenshotStreaming();
