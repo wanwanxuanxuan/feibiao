@@ -2,7 +2,7 @@
 /* 重要：每次修改 app.js 或 style.css 后，必须同步提升各 HTML 中引用的 ?v= 版本号。
    GitHub Pages 对静态资源返回 cache-control: max-age=14400（4 小时），
    不加版本号会导致用户浏览器长时间继续运行旧脚本。 */
-const APP_VERSION='5';
+const APP_VERSION='7';
 
 /* ============ 同步状态指示 ============ */
 function setSyncStatus(state){
@@ -41,7 +41,7 @@ const DB = {
 };
 const DEFAULT_STORE = {
   tasks:[], schedule:[], grades:[], notes:[], countdowns:[], pomoLog:[], theme:'light',
-  homework:[], notices:[], students:[], teacherPwd:null, parentPwd:null, _meta:null
+  homework:[], notices:[], students:[], records:{}, teacherPwd:null, parentPwd:null, _meta:null
 };
 let store = {...DEFAULT_STORE, ...DB.get(DB.key, {})};
 // 确保所有字段存在
@@ -399,6 +399,7 @@ function navTo(v){
   document.getElementById('sidebar').classList.remove('open');
   if(v==='stats')setTimeout(()=>{try{stats.render()}catch(e){}},50);
   if(v==='grades')setTimeout(()=>{try{grades.render()}catch(e){}},50);
+  if(v==='records')setTimeout(()=>{try{records.render()}catch(e){}},50);
   window.scrollTo(0,0);
 }
 document.getElementById('nav').addEventListener('click',e=>{
@@ -534,22 +535,17 @@ const syncSettings={
           <div style="font-size:11px;color:var(--muted);margin-top:5px">令牌只保存在本设备浏览器，不会随同步数据上传，请勿在公共设备填写。</div>
         </div>
         <div id="gh_result" style="font-size:12px;color:var(--muted)"></div>
-        <div style="border-top:1px solid var(--border);padding-top:14px;display:grid;gap:14px">
-          <div style="font-weight:700;font-size:13px">进入密码设置</div>
-          ${['teacher','parent'].map(r=>{
-            const m=ROLE_META[r];
-            const st=auth.isDefault(r)?'<span style="color:var(--warn)">初始密码 123456</span>'
-              :(auth.has(r)?'<span style="color:var(--success)">已自定义</span>':'<span style="color:var(--muted)">未设置</span>');
-            return `<div>
-              <div style="font-weight:600;font-size:13px;margin-bottom:4px">${m.name}端密码</div>
-              <div style="font-size:12px;color:var(--muted);margin-bottom:8px">当前：${st} · 进入${m.name}端需验证</div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <input class="input" id="pwd_${r}" type="password" placeholder="新密码（≥4 位）" style="flex:1;min-width:150px" autocomplete="off">
-                <button class="btn btn-ghost btn-sm" onclick="syncSettings.setPwd('${r}')">保存</button>
-                <button class="btn btn-ghost btn-sm" onclick="syncSettings.resetPwd('${r}')">重置为 123456</button>
-              </div>
-            </div>`;
-          }).join('')}
+        <div style="border-top:1px solid var(--border);padding-top:14px">
+          <div style="font-weight:700;font-size:13px">本端密码设置</div>
+          ${currentRole==='student'
+            ? `<div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.7">学生端无需密码（首次进入填写姓名即可）。老师可在老师端的「学生档案 → 密码管理」里统一设置老师端与家长端的密码。</div>`
+            : `<div style="font-size:12px;color:var(--muted);margin:8px 0;line-height:1.7">这里只能修改本端（${ROLE_META[currentRole].name}端）的密码，不能修改其它端的密码。老师可在「学生档案 → 密码管理」里统一设置所有人的密码。</div>
+               <div style="display:flex;gap:8px;flex-wrap:wrap">
+                 <input class="input" id="pwd_self" type="password" placeholder="新密码（≥4 位）" style="flex:1;min-width:150px" autocomplete="off">
+                 <button class="btn btn-ghost btn-sm" onclick="syncSettings.setPwd()">保存</button>
+                 <button class="btn btn-ghost btn-sm" onclick="syncSettings.resetPwd()">重置为 ${DEF_PWD}</button>
+               </div>
+               <div style="font-size:11px;color:var(--muted);margin-top:8px">当前：${auth.isDefault(currentRole)?`<span style="color:var(--warn)">初始密码 ${DEF_PWD}</span>`:(auth.has(currentRole)?'<span style="color:var(--success)">已自定义</span>':'<span style="color:var(--muted)">未设置</span>')}</div>`}
         </div>
       </div>`,
       `<button class="btn btn-ghost" onclick="closeModal()">关闭</button>
@@ -590,16 +586,17 @@ const syncSettings={
     }
     ghSync.cfg=bCfg;ghSync.setToken(bTok);
   },
-  async setPwd(role){
-    const v=(document.getElementById('pwd_'+role)||{}).value||'';
+  /* 只能修改本端自己的密码 */
+  async setPwd(){
+    const v=(document.getElementById('pwd_self')||{}).value||'';
     if(v.length<4){toast('密码至少 4 位');return}
-    await auth.setPwd(role,v);auth.unlock(role);
-    toast(ROLE_META[role].name+'端密码已更新');closeModal();
+    await auth.setPwd(currentRole,v);auth.unlock(currentRole);
+    toast(ROLE_META[currentRole].name+'端密码已更新');closeModal();
   },
-  resetPwd(role){
-    if(!confirm(`确定将${ROLE_META[role].name}端密码重置为初始密码 ${DEF_PWD}？`))return;
-    auth.resetPwd(role);auth.unlock(role);closeModal();
-    toast(ROLE_META[role].name+'端密码已重置为 '+DEF_PWD);
+  resetPwd(){
+    if(!confirm(`确定将${ROLE_META[currentRole].name}端密码重置为初始密码 ${DEF_PWD}？`))return;
+    auth.resetPwd(currentRole);auth.unlock(currentRole);closeModal();
+    toast(ROLE_META[currentRole].name+'端密码已重置为 '+DEF_PWD);
   },
   toggleTheme(){
     store.theme=store.theme==='dark'?'light':'dark';
@@ -1232,6 +1229,293 @@ const grades={
   del(id){if(confirm('确定删除？')){store.grades=store.grades.filter(x=>x.id!==id);save();grades.render();toast('已删除')}}
 };
 
+/* ============ 学生档案 / 成绩曲线 ============
+   老师：学生列表 → 给每个学生指派家长、录入每次成绩（科目/考试/日期/得分/满分）、写老师建议
+   家长 / 学生：只能看（自己 / 自己孩子的曲线、成绩明细、老师建议）            */
+const RECORD_PALETTE=['#6366f1','#10b981','#f59e0b','#ef4444','#06b6d4','#a855f7','#f97316','#14b8a6'];
+const records={
+  editing:'',        // 正在编辑的学生（用名字会拼进内联事件，故用具名状态）
+  list:[],           // 渲染时的学生名单快照，配合下标点击
+  names(){
+    const out=(store.students||[]).slice();
+    Object.keys(store.records||{}).forEach(n=>{if(out.indexOf(n)<0)out.push(n)});
+    return out;
+  },
+  rec(n){
+    store.records=store.records||{};
+    if(!store.records[n])store.records[n]={parent:'',advice:'',scores:[]};
+    const r=store.records[n];
+    if(!Array.isArray(r.scores))r.scores=[];
+    if(typeof r.parent!=='string')r.parent='';
+    if(typeof r.advice!=='string')r.advice='';
+    return r;
+  },
+  parentOf(n){const r=(store.records||{})[n];return (r&&r.parent)||''},
+  /* 当前角色该看哪个学生：学生端=本人；家长端=所选孩子 */
+  me(){return currentRole==='parent'?persona.get('parent'):persona.get('student')},
+  rate(s){const f=+s.full||0;return f>0?(+s.score||0)/f*100:(+s.score||0)},
+  render(){
+    const root=document.getElementById('recordsRoot');if(!root)return;
+    if(currentRole==='teacher'){root.innerHTML=this.teacherHtml();return}
+    const name=this.me();
+    root.innerHTML=this.detailHtml(name);
+    if(name)this.drawChart(this.rec(name).scores);
+  },
+  /* ---------- 老师：学生列表 ---------- */
+  teacherHtml(){
+    const list=this.names();
+    this.list=list;
+    const bound=list.filter(n=>this.parentOf(n)).length;
+    const rows=list.length
+      ? `<table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--border)">
+            <th style="padding:8px">学生</th><th>家长</th><th>成绩</th><th style="text-align:right">操作</th></tr></thead>
+          <tbody>${list.map((n,i)=>{
+            const r=this.rec(n);
+            return `<tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:10px 8px;font-weight:600">${esc(n)}</td>
+              <td>${r.parent?esc(r.parent):'<span style="color:var(--danger)">未绑定家长</span>'}</td>
+              <td>${r.scores.length} 次${r.advice?' · 已写建议':''}</td>
+              <td style="text-align:right;white-space:nowrap">
+                <button class="btn btn-ghost btn-sm" onclick="records.openIdx(${i})">设置</button>
+                <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="records.delIdx(${i})">删除</button>
+              </td></tr>`}).join('')}</tbody></table>`
+      : `<div class="empty" style="padding:26px">还没有学生 —— 学生首次进入学生端会自动登记姓名，也可以点右上角「+ 添加学生」。</div>`;
+    return `
+      <div class="grid grid-3" style="margin-bottom:16px">
+        <div class="stat-card"><div class="glow" style="background:var(--primary)"></div>
+          <div class="label">学生总数</div><div class="value">${list.length}</div>
+          <div class="trend" style="color:var(--primary)">已登记学生</div></div>
+        <div class="stat-card"><div class="glow" style="background:var(--success)"></div>
+          <div class="label">已绑定家长</div><div class="value">${bound}</div>
+          <div class="trend" style="color:var(--success)">家长已指派</div></div>
+        <div class="stat-card"><div class="glow" style="background:var(--danger)"></div>
+          <div class="label">未绑定家长</div><div class="value">${list.length-bound}</div>
+          <div class="trend" style="color:${list.length-bound?'var(--danger)':'var(--success)'}">${list.length-bound?'需要指派家长':'全部已绑定'}</div></div>
+      </div>
+      ${list.length-bound>0?`<div class="role-hint" style="border-color:var(--danger);color:var(--danger)">⚠️ 有 ${list.length-bound} 名学生还没有家长，请点「设置」为 TA 指派家长（每个学生都要有一个家长）。</div>`:''}
+      <div class="card card-pad" style="margin-bottom:16px">
+        <div class="flex" style="gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="card-title" style="margin:0"><span class="dot"></span>学生与家长</div>
+          <button class="btn btn-primary" style="margin-left:auto" onclick="records.addStudent()">+ 添加学生</button>
+        </div>
+        <div style="margin-top:14px">${rows}</div>
+      </div>
+      <div class="card card-pad">
+        <div class="card-title"><span class="dot" style="background:var(--info)"></span>密码管理（所有人）</div>
+        <div style="font-size:12px;color:var(--muted);margin:10px 0 14px;line-height:1.7">
+          老师可在这里统一设置所有人的密码。学生端无需密码（首次进入填姓名即可）。
+        </div>
+        <div id="pwdRows">${['teacher','parent'].map(r=>{
+          const st=auth.isDefault(r)?'<span style="color:var(--warn)">初始密码 123456</span>'
+            :(auth.has(r)?'<span style="color:var(--success)">已自定义</span>':'<span style="color:var(--muted)">未设置</span>');
+          return `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+            <div style="min-width:86px;font-weight:600;font-size:13px">${ROLE_META[r].name}端密码</div>
+            <input class="input" id="rpwd_${r}" type="password" placeholder="新密码（≥4 位）" autocomplete="off" style="flex:1;min-width:150px">
+            <button class="btn btn-ghost btn-sm" onclick="records.setPwd('${r}')">保存</button>
+            <button class="btn btn-ghost btn-sm" onclick="records.resetPwd('${r}')">重置为 ${DEF_PWD}</button>
+          </div><div style="font-size:11px;color:var(--muted);margin:-6px 0 12px 94px">当前：${st}</div>`;
+        }).join('')}
+        <div style="font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:10px;line-height:1.7">
+          说明：密码只以哈希形式保存在本设备浏览器，不会上传到 GitHub（仓库是公开的），所以这里设置的是「本设备上各端的密码」。
+        </div>
+      </div>`;
+  },
+  openIdx(i){const n=(this.list||[])[i];if(!n){toast('名单已更新，请重试');return}this.openStudent(n)},
+  delIdx(i){const n=(this.list||[])[i];if(!n)return;this.delStudent(n)},
+  addStudent(){
+    const name=(prompt('请输入学生姓名')||'').trim();
+    if(!name)return;
+    if((store.students||[]).indexOf(name)<0)store.students=(store.students||[]).concat(name);
+    this.rec(name);save();this.render();toast('已添加学生：'+name);
+  },
+  delStudent(name){
+    if(!confirm(`确定删除学生「${name}」？TA 的成绩记录与老师建议会一并删除。`))return;
+    store.students=(store.students||[]).filter(n=>n!==name);
+    if(store.records)delete store.records[name];
+    save();this.render();toast('已删除：'+name);
+  },
+  /* ---------- 老师：单个学生档案编辑 ---------- */
+  openStudent(name){
+    if(currentRole!=='teacher'){toast('仅老师可编辑学生档案');return}
+    this.editing=name;
+    const r=this.rec(name);
+    const rows=r.scores.length
+      ? `<table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--border)">
+            <th style="padding:6px">科目</th><th>考试</th><th>日期</th><th>得分</th><th>满分</th><th></th></tr></thead>
+          <tbody>${r.scores.map((s,i)=>`<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:8px 6px;font-weight:600">${esc(s.subject||'—')}</td>
+            <td>${esc(s.title||'—')}</td>
+            <td>${esc(s.date||'—')}</td>
+            <td>${esc(s.score)}</td>
+            <td>${esc(s.full)}</td>
+            <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="records.delScore(${i})">删除</button></td>
+          </tr>`).join('')}</tbody></table>`
+      : `<div class="empty" style="padding:18px">还没有成绩记录，用下面一行添加。</div>`;
+    openModal('学生档案 · '+name,`
+      <div style="display:grid;gap:16px">
+        <div>
+          <label class="lbl">家长姓名 / 称呼（留空表示未绑定家长）</label>
+          <input class="input" id="r_parent" value="${esc(r.parent)}" placeholder="例如：张小明爸爸" autocomplete="off">
+        </div>
+        <div>
+          <label class="lbl">老师建议（家长和学生只能看，不能改）</label>
+          <textarea class="input" id="r_advice" rows="3" style="width:100%;min-height:78px" placeholder="例如：计算题需要多练，阅读保持稳定，继续加油！">${esc(r.advice)}</textarea>
+        </div>
+        <div style="display:grid;gap:10px;border-top:1px solid var(--border);padding-top:14px">
+          <div style="font-weight:700;font-size:13px">每次成绩（${r.scores.length} 次）</div>
+          ${rows}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;border-top:1px dashed var(--border);padding-top:12px">
+            <input class="input" id="s_subject" placeholder="科目，如 数学">
+            <input class="input" id="s_title" placeholder="考试，如 期中考试">
+            <input class="input" id="s_date" type="date" value="${new Date().toISOString().slice(0,10)}">
+            <input class="input" id="s_score" type="number" placeholder="得分" step="0.5">
+            <input class="input" id="s_full" type="number" placeholder="满分，如 100" step="0.5">
+            <button class="btn btn-ghost" onclick="records.addScore()">+ 添加这次成绩</button>
+          </div>
+        </div>
+      </div>`,
+      `<button class="btn btn-ghost" onclick="closeModal()">关闭</button>
+       <button class="btn btn-primary" onclick="records.saveInfo()">保存家长与建议</button>`);
+  },
+  /* 把弹窗里当前的「家长 / 老师建议」输入暂存进记录，
+     供 addScore / delScore 重渲染弹窗时使用，避免尚未保存的内容被清空 */
+  stashInfo(r){
+    const pe=document.getElementById('r_parent'), ae=document.getElementById('r_advice');
+    if(pe)r.parent=(pe.value||'').trim();
+    if(ae)r.advice=(ae.value||'').trim();
+  },
+  saveInfo(){
+    const name=this.editing;if(!name)return;
+    const r=this.rec(name);
+    this.stashInfo(r);
+    save();toast('已保存');
+    this.render();          // 同步刷新背后的学生列表与统计
+    this.openStudent(name);
+  },
+  addScore(){
+    const name=this.editing;if(!name)return;
+    const g=id=>(document.getElementById(id).value||'').trim();
+    const subject=g('s_subject'),title=g('s_title'),date=g('s_date');
+    const score=+g('s_score'),full=+g('s_full');
+    if(!subject&&!title){toast('请填写科目或考试名称');return}
+    if(!isFinite(score)||g('s_score')===''){toast('请填写得分');return}
+    if(!isFinite(full)||full<=0){toast('请填写满分（大于 0）');return}
+    if(score>full){toast('得分不能大于满分');return}
+    const r=this.rec(name);
+    this.stashInfo(r);      // 暂存弹窗里已填的家长/建议，避免重渲染时丢失
+    r.scores.push({id:uid(),subject,title,date,score,full});
+    save();toast('已添加成绩');this.render();this.openStudent(name);
+  },
+  delScore(i){
+    const name=this.editing;if(!name)return;
+    const r=this.rec(name);
+    if(!r.scores[i])return;
+    this.stashInfo(r);      // 同上，保留弹窗里已填的家长/建议
+    r.scores.splice(i,1);save();toast('已删除');this.render();this.openStudent(name);
+  },
+  async setPwd(r){
+    const el=document.getElementById('rpwd_'+r);
+    const v=(el?el.value:'')||'';
+    if(v.length<4){toast('密码至少 4 位');return}
+    await auth.setPwd(r,v);this.render();toast(ROLE_META[r].name+'端密码已更新');
+  },
+  resetPwd(r){
+    if(!confirm(`确定将${ROLE_META[r].name}端密码重置为初始密码 ${DEF_PWD}？`))return;
+    auth.resetPwd(r);this.render();toast(ROLE_META[r].name+'端密码已重置为 '+DEF_PWD);
+  },
+  /* ---------- 家长 / 学生：只读详情 ---------- */
+  detailHtml(name){
+    if(!name){
+      return `<div class="card card-pad" style="text-align:center;padding:36px">
+        <div style="font-size:14px;color:var(--muted);margin-bottom:16px">${currentRole==='parent'?'请先选择你孩子的姓名，才能查看 TA 的成绩曲线与老师建议。':'请先填写你的姓名，才能看到老师为你录入的成绩曲线与建议。'}</div>
+        <button class="btn btn-primary" onclick="persona.change()">${currentRole==='parent'?'选择学生':'填写姓名'}</button>
+      </div>`;
+    }
+    const r=this.rec(name);
+    const scores=r.scores.slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+    const rated=scores.filter(s=>+s.full>0);
+    const avg=rated.length?rated.reduce((a,s)=>a+this.rate(s),0)/rated.length:null;
+    const last=scores.length?this.rate(scores[scores.length-1]):null;
+    const tbl=scores.length
+      ? `<table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--border)">
+            <th style="padding:8px">科目</th><th>考试</th><th>日期</th><th>得分</th><th>满分</th><th>得分率</th></tr></thead>
+          <tbody>${scores.map(s=>{const p=this.rate(s);
+            const c=+s.full>0?(p>=85?'var(--success)':p>=60?'var(--warn)':'var(--danger)'):'var(--muted)';
+            return `<tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:10px 8px;font-weight:600">${esc(s.subject||'—')}</td>
+              <td>${esc(s.title||'—')}</td>
+              <td>${esc(s.date||'—')}</td>
+              <td>${esc(s.score)}</td>
+              <td>${esc(s.full)}</td>
+              <td style="color:${c};font-weight:700">${(+s.full>0?p.toFixed(1)+'%':esc(s.score))}</td>
+            </tr>`}).join('')}</tbody></table>`
+      : `<div class="empty" style="padding:26px">老师还没有录入成绩</div>`;
+    const pct=v=>v==null?'—':v.toFixed(1)+'%';
+    return `
+      ${r.parent?`<div class="role-hint">👨‍👩‍👧 家长：${esc(r.parent)}</div>`:''}
+      <div class="grid grid-3" style="margin-bottom:16px">
+        <div class="stat-card"><div class="glow" style="background:var(--primary)"></div>
+          <div class="label">${esc(name)} 的考试次数</div><div class="value">${scores.length}</div>
+          <div class="trend" style="color:var(--primary)">次</div></div>
+        <div class="stat-card"><div class="glow" style="background:var(--success)"></div>
+          <div class="label">平均得分率</div><div class="value">${pct(avg)}</div>
+          <div class="trend" style="color:var(--success)">按满分折算</div></div>
+        <div class="stat-card"><div class="glow" style="background:var(--accent)"></div>
+          <div class="label">最近一次</div><div class="value">${pct(last)}</div>
+          <div class="trend" style="color:var(--accent)">${scores.length?esc(scores[scores.length-1].title||scores[scores.length-1].subject||''):'暂无'}</div></div>
+      </div>
+      <div class="card card-pad" style="margin-bottom:16px">
+        <div class="card-title"><span class="dot" style="background:var(--info)"></span>成绩曲线（按科目）</div>
+        <div style="margin-top:14px">${scores.length?'<canvas id="recordsChart" height="110"></canvas>':'<div class="empty" style="padding:26px">老师还没有录入成绩</div>'}</div>
+      </div>
+      <div class="card card-pad" style="margin-bottom:16px">
+        <div class="card-title"><span class="dot"></span>成绩明细</div>
+        <div style="margin-top:14px">${tbl}</div>
+      </div>
+      <div class="card card-pad">
+        <div class="card-title"><span class="dot" style="background:var(--accent)"></span>老师建议</div>
+        <div style="margin-top:12px;font-size:14px;line-height:1.9;white-space:pre-wrap">${r.advice?esc(r.advice):'<span style="color:var(--muted)">老师还没有留下建议</span>'}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:10px">${currentRole==='parent'?'老师建议由老师录入，家长只能查看。':'老师建议由老师录入，你只能查看。'}${currentRole==='parent'?' 如需更换孩子：<a href="javascript:persona.change()" style="color:var(--primary)">更改绑定的学生</a>':' 如需改名：<a href="javascript:persona.change()" style="color:var(--primary)">修改姓名</a>'}</div>
+      </div>`;
+  },
+  drawChart(scores){
+    const cv=document.getElementById('recordsChart');if(!cv)return;
+    if(cv._chart){cv._chart.destroy();cv._chart=null}
+    if(!scores||!scores.length)return;
+    const sorted=scores.slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+    const label=s=>s.title||s.subject||'考试';
+    const labels=[];
+    sorted.forEach(s=>{const l=label(s);if(labels.indexOf(l)<0)labels.push(l)});
+    const subjects=[];
+    sorted.forEach(s=>{const k=s.subject||'其他';if(subjects.indexOf(k)<0)subjects.push(k)});
+    const datasets=subjects.map((sub,i)=>({
+      label:sub,
+      data:labels.map(l=>{
+        const hit=sorted.filter(s=>label(s)===l&&(s.subject||'其他')===sub);
+        if(!hit.length)return null;
+        const s=hit[hit.length-1];
+        return +s.full>0?+(this.rate(s).toFixed(1)):(+s.score||0);
+      }),
+      borderColor:RECORD_PALETTE[i%RECORD_PALETTE.length],
+      backgroundColor:RECORD_PALETTE[i%RECORD_PALETTE.length],
+      tension:.3,spanGaps:true,pointRadius:4,borderWidth:2
+    }));
+    const th=chartTheme();
+    cv._chart=new Chart(cv,{
+      type:'line',
+      data:{labels,datasets},
+      options:{responsive:true,maintainAspectRatio:true,
+        plugins:{legend:{display:datasets.length>1,labels:{color:th.muted,boxWidth:12}},
+          tooltip:{callbacks:{label:c=>`${c.dataset.label}：得分率 ${c.formattedValue}%`}}},
+        scales:{y:{beginAtZero:true,max:100,grid:{color:th.border},ticks:{color:th.muted,callback:v=>v+'%'}},
+          x:{grid:{display:false},ticks:{color:th.muted}}}}
+    });
+  }
+};
+
 /* ============ Pomodoro Module ============ */
 const pomodoro={
   mode:'focus',dur:{focus:25*60,short:5*60,long:15*60},left:25*60,timer:null,running:false,
@@ -1512,7 +1796,8 @@ RENDERERS.push(
   ()=>homework.render(),
   ()=>notices.render(),
   ()=>pomodoro.renderLog(),
-  ()=>{if(document.getElementById('view-stats').classList.contains('active'))stats.render()}
+  ()=>{if(document.getElementById('view-stats').classList.contains('active'))stats.render()},
+  ()=>{if(document.getElementById('view-records').classList.contains('active'))records.render()}
 );
 renderAll();
 pomodoro.update();
