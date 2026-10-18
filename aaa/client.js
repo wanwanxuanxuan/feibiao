@@ -65,6 +65,17 @@ class AIBrowserAgentClient {
             this.connected = false;
             this.updateConnectionStatus(false);
             this.reconnectAttempts++;
+
+            // If connection fails multiple times and page is served from HTTPS,
+            // suggest using localhost to avoid mixed content issues
+            if (this.reconnectAttempts >= 3 && location.protocol === 'https:') {
+                const helpText = document.querySelector('#connection-help .connection-help-text p');
+                if (helpText && !helpText.dataset.httpsWarned) {
+                    helpText.dataset.httpsWarned = 'true';
+                    helpText.innerHTML = '从 HTTPS 页面连接本地后端可能被浏览器安全策略阻止。<br><strong>建议改用 <code>http://localhost:3000</code> 打开本页</strong>，或确保后端正在运行。';
+                }
+            }
+
             const delay = Math.min(2000 * this.reconnectAttempts, 10000);
             setTimeout(() => this.connectWebSocket(), delay);
         };
@@ -85,17 +96,21 @@ class AIBrowserAgentClient {
 
     updateConnectionStatus(connected) {
         const el = document.getElementById('connection-status');
-        if (!el) return;
-        const dot = el.querySelector('.conn-dot');
-        const text = el.querySelector('.conn-text');
-        if (connected) {
-            el.classList.add('connected');
-            el.classList.remove('disconnected');
-            text.textContent = '已连接';
-        } else {
-            el.classList.remove('connected');
-            el.classList.add('disconnected');
-            text.textContent = '未连接';
+        const helpPanel = document.getElementById('connection-help');
+        if (el) {
+            const dot = el.querySelector('.conn-dot');
+            const text = el.querySelector('.conn-text');
+            if (connected) {
+                el.classList.add('connected');
+                el.classList.remove('disconnected');
+                text.textContent = '已连接';
+                if (helpPanel) helpPanel.style.display = 'none';
+            } else {
+                el.classList.remove('connected');
+                el.classList.add('disconnected');
+                text.textContent = '未连接';
+                if (helpPanel) helpPanel.style.display = 'flex';
+            }
         }
     }
 
@@ -232,6 +247,11 @@ class AIBrowserAgentClient {
         let url = urlInput.value.trim();
         if (!url) return;
 
+        if (!this.connected) {
+            alert('⚠️ 后端未连接，无法打开网页。\n\n请确保已运行后端服务 (node server.js)，\n或点击页面中的"重试连接"按钮。');
+            return;
+        }
+
         this.sendMessage({ type: 'navigate', url });
         document.getElementById('browser-overlay').classList.add('hidden');
     }
@@ -324,6 +344,11 @@ class AIBrowserAgentClient {
     startAgent() {
         const model = this.getSelectedModel();
         const task = document.getElementById('task-input').value.trim();
+
+        if (!this.connected) {
+            alert('⚠️ 后端未连接，AI 无法控制浏览器。\n\n请确保已运行后端服务 (node server.js)，\n或点击页面中的"重试连接"按钮。');
+            return;
+        }
 
         if (!model) {
             alert('请先选择一个 AI 模型');
@@ -1009,6 +1034,18 @@ Rules:
                 hint.style.display = this.isFreeModel(modelId) ? 'block' : 'none';
             }
         });
+
+        // Retry connection button
+        const retryBtn = document.getElementById('retry-connection-btn');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', () => {
+                if (this.ws) {
+                    this.ws.close();
+                }
+                this.reconnectAttempts = 0;
+                this.connectWebSocket();
+            });
+        }
 
         // URL navigation
         document.getElementById('navigate-btn').addEventListener('click', () => this.navigate());
