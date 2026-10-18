@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#06060a" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="description" content="《超级家长模拟器》—— 一款反讽向 3D 互动叙事游戏。教育不是征服，是陪他打怪升级。" />
+<title>超级家长模拟器 · 3D 互动叙事</title>
+<link rel="stylesheet" href="./style.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.min.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="gl"></canvas>
+
+  <!-- 后期处理叠层 -->
+  <div class="fx" id="grade"></div>
+  <div class="fx" id="vignette"></div>
+  <div class="fx" id="grain"></div>
+  <div class="fx" id="redpulse"></div>
+  <div class="fx" id="cracks"></div>
+  <div class="fx" id="flash"></div>
+
+  <!-- UI -->
+  <div id="ui">
+    <div id="topbar">
+      <div class="chapter">
+        <span id="chapterName">序章</span>
+        <small id="chapterSub">家长会之后</small>
+      </div>
+      <div class="stats">
+        <div class="stat ob" id="statOb">
+          <div class="lbl"><span>听话值</span><b>0</b></div>
+          <div class="bar"><i></i></div>
+        </div>
+        <div class="stat tr" id="statTr">
+          <div class="lbl"><span>心理创伤值</span><b>0</b></div>
+          <div class="bar"><i></i></div>
+        </div>
+        <div class="stat fa" id="statFa">
+          <div class="lbl"><span>好感</span><b>0</b></div>
+          <div class="bar"><i></i></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="stage">
+      <div id="taskpanel" style="display:none"></div>
+      <div id="dialogue" class="clickable">
+        <span class="who narrator" id="who">旁白</span>
+        <div class="txt" id="txt"></div>
+        <div class="next" id="next">▼ 点击继续</div>
+      </div>
+      <div id="choices" style="display:none"></div>
+    </div>
+
+    <div id="inventory"></div>
+  </div>
+
+  <!-- 弹窗 -->
+  <div id="modal">
+    <div class="card">
+      <h2 id="modalTitle">系统提示</h2>
+      <div class="body" id="modalBody"></div>
+      <div class="foot" id="modalFoot"></div>
+    </div>
+  </div>
+
+  <div id="toasts"></div>
+
+  <!-- 开场幕布 -->
+  <div class="curtain on" id="startScreen">
+    <div class="sub">反讽向 3D 互动叙事 · 全年龄警示</div>
+    <h1>超级家长<br />模拟器</h1>
+    <div class="note">
+      本作所有「暴力教育」选项均为<b>反讽设计</b>。<br />
+      现实中，暴力不会弹出绿色的「听话值 +50」，<br />
+      只会弹出孩子的心理创伤诊断书。<br /><br />
+      全程约 7–8 分钟。每个选择有倒计时，<b>不选则默认选择最暴力的那个</b>。
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="btnStart">开始游戏</button>
+      <button class="btn ghost" id="btnQuick">直接看真结局</button>
+    </div>
+    <div class="tiny">手机 / 电脑 均可游玩 · 建议开启声音</div>
+  </div>
+
+  <!-- 结局幕布 -->
+  <div class="curtain" id="endScreen">
+    <div class="sub" id="endSub">结局</div>
+    <div class="end-title" id="endTitle"></div>
+    <div class="end-body" id="endBody"></div>
+    <div class="score" id="endScore"></div>
+    <div class="stamp" id="endStamp"></div>
+    <div class="actions">
+      <button class="btn primary" id="btnAgain">重新教育一遍</button>
+      <button class="btn ghost" id="btnEgg">看彩蛋</button>
+    </div>
+    <div class="tiny">《超级家长模拟器》 · 全剧终</div>
+  </div>
+</div>
+
+<noscript>本游戏需要开启 JavaScript。</noscript>
+<script type="module" src="./js/game.js"></script>
+</body>
+</html>
