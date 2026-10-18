@@ -21,10 +21,18 @@ class AIBrowserAgentClient {
         this.models = [];
         this.apiKeys = {};
         this.backendUrl = 'ws://localhost:3000';
+        // If page is loaded from localhost:3000, use same origin for HTTP fallback
+        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+            this.httpBackendUrl = `${location.protocol}//${location.host}`;
+        } else {
+            this.httpBackendUrl = 'http://localhost:3000';
+        }
         this.canvas = null;
         this.ctx = null;
         this.scale = 1;
         this.reconnectAttempts = 0;
+        this.useHttpFallback = false;
+        this.httpPollingInterval = null;
 
         // Free AI agent state (Puter.js)
         this.freeAgent = null;
@@ -66,6 +74,13 @@ class AIBrowserAgentClient {
             this.updateConnectionStatus(false);
             this.reconnectAttempts++;
 
+            // If WebSocket fails 3 times, try HTTP fallback mode
+            if (this.reconnectAttempts >= 3 && !this.useHttpFallback) {
+                console.log('WebSocket failed 3 times, trying HTTP fallback mode...');
+                this.startHttpFallback();
+                return;
+            }
+
             // If connection fails multiple times and page is served from HTTPS,
             // suggest using localhost to avoid mixed content issues
             if (this.reconnectAttempts >= 3 && location.protocol === 'https:') {
@@ -94,6 +109,91 @@ class AIBrowserAgentClient {
         };
     }
 
+    // --- HTTP Fallback Mode ---
+    // Used when WebSocket is unavailable (e.g., mixed content from HTTPS pages)
+
+    async startHttpFallback() {
+        this.useHttpFallback = true;
+        console.log('Starting HTTP fallback mode...');
+
+        try {
+            // Test if backend is reachable via HTTP
+            const res = await fetch(`${this.httpBackendUrl}/api/status`);
+            if (res.ok) {
+                const data = await res.json();
+                this.currentUrl = data.url || 'about:blank';
+                this.viewport = data.viewport || this.viewport;
+                this.connected = true;
+                this.updateConnectionStatus(true);
+                this.populateModelSelect();
+                this.updateUrlDisplay();
+
+                // Start polling for screenshots
+                this.httpPollingInterval = setInterval(() => this.pollScreenshot(), 500);
+                console.log('HTTP fallback mode active - polling screenshots');
+                return;
+            }
+        } catch (e) {
+            console.log('HTTP fallback failed:', e.message);
+        }
+
+        // If HTTP also fails, keep trying WebSocket
+        this.useHttpFallback = false;
+        setTimeout(() => this.connectWebSocket(), 3000);
+    }
+
+    stopHttpFallback() {
+        if (this.httpPollingInterval) {
+            clearInterval(this.httpPollingInterval);
+            this.httpPollingInterval = null;
+        }
+        this.useHttpFallback = false;
+    }
+
+    async pollScreenshot() {
+        try {
+            const res = await fetch(`${this.httpBackendUrl}/api/screenshot`);
+            if (res.ok) {
+                const data = await res.json();
+                this.renderScreenshot(data.data, data.viewport);
+                if (data.url) {
+                    this.currentUrl = data.url;
+                    this.updateUrlDisplay();
+                }
+            }
+        } catch (e) {
+            // Silently fail - will retry on next poll
+        }
+    }
+
+    async sendHttpMessage(message) {
+        const endpointMap = {
+            'navigate': '/api/navigate',
+            'click': '/api/click',
+            'type': '/api/type',
+            'keypress': '/api/keypress',
+            'scroll': '/api/scroll',
+            'go_back': '/api/go-back',
+            'go_forward': '/api/go-forward',
+        };
+
+        const endpoint = endpointMap[message.type];
+        if (!endpoint) return;
+
+        try {
+            const res = await fetch(`${this.httpBackendUrl}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(message)
+            });
+            const data = await res.json();
+            return data;
+        } catch (e) {
+            console.error('HTTP request failed:', e.message);
+            return null;
+        }
+    }
+
     updateConnectionStatus(connected) {
         const el = document.getElementById('connection-status');
         const helpPanel = document.getElementById('connection-help');
@@ -115,6 +215,13 @@ class AIBrowserAgentClient {
     }
 
     sendMessage(message) {
+        if (this.useHttpFallback) {
+            // In HTTP fallback mode, send via HTTP API
+            if (['navigate', 'click', 'type', 'keypress', 'scroll', 'go_back', 'go_forward'].includes(message.type)) {
+                this.sendHttpMessage(message);
+            }
+            return;
+        }
         if (this.ws && this.ws.readyState === 1) {
             this.ws.send(JSON.stringify(message));
         } else {
@@ -242,7 +349,7 @@ class AIBrowserAgentClient {
 
     // --- URL Navigation ---
 
-    navigate() {
+    async navigate() {
         const urlInput = document.getElementById('url-input');
         let url = urlInput.value.trim();
         if (!url) return;
@@ -252,8 +359,14 @@ class AIBrowserAgentClient {
             return;
         }
 
-        this.sendMessage({ type: 'navigate', url });
         document.getElementById('browser-overlay').classList.add('hidden');
+
+        if (this.useHttpFallback) {
+            // HTTP mode - send navigate request and wait for polling to update
+            this.sendHttpMessage({ type: 'navigate', url });
+        } else {
+            this.sendMessage({ type: 'navigate', url });
+        }
     }
 
     updateUrlDisplay() {
@@ -740,6 +853,23 @@ Rules:
     }
 
     requestScreenshot() {
+        // In HTTP fallback mode, fetch screenshot directly via HTTP API
+        if (this.useHttpFallback) {
+            return new Promise(async (resolve) => {
+                try {
+                    const res = await fetch(`${this.httpBackendUrl}/api/screenshot`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        resolve(data.data);
+                    } else {
+                        resolve(null);
+                    }
+                } catch (e) {
+                    resolve(null);
+                }
+            });
+        }
+
         return new Promise((resolve) => {
             let resolved = false;
             const timeout = setTimeout(() => {
@@ -1039,11 +1169,20 @@ Rules:
         const retryBtn = document.getElementById('retry-connection-btn');
         if (retryBtn) {
             retryBtn.addEventListener('click', () => {
+                this.stopHttpFallback();
                 if (this.ws) {
                     this.ws.close();
                 }
                 this.reconnectAttempts = 0;
+                // Try WebSocket first, will fall back to HTTP if it fails
                 this.connectWebSocket();
+                // Also try HTTP fallback immediately in parallel
+                setTimeout(() => {
+                    if (!this.connected) {
+                        console.log('Retry: also trying HTTP fallback...');
+                        this.startHttpFallback();
+                    }
+                }, 1000);
             });
         }
 

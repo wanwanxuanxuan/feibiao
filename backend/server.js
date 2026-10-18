@@ -23,9 +23,152 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
+// CORS support - allow requests from GitHub Pages and localhost
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // API endpoint to get available models
 app.get('/api/models', (req, res) => {
   res.json({ models: getAvailableModels() });
+});
+
+// --- HTTP API for browser control (fallback when WebSocket is unavailable) ---
+
+// Get current screenshot
+app.get('/api/screenshot', async (req, res) => {
+  if (!page) {
+    return res.status(503).json({ error: 'Browser not initialized' });
+  }
+  try {
+    const screenshot = await page.screenshot({ type: 'jpeg', quality: 70 });
+    res.json({
+      type: 'screenshot',
+      data: screenshot.toString('base64'),
+      viewport: viewportSize,
+      url: page.url(),
+      title: await page.title().catch(() => '')
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get current status (URL, title)
+app.get('/api/status', async (req, res) => {
+  if (!page) {
+    return res.status(503).json({ error: 'Browser not initialized' });
+  }
+  res.json({
+    url: page.url(),
+    title: await page.title().catch(() => ''),
+    viewport: viewportSize
+  });
+});
+
+// Navigate to URL
+app.post('/api/navigate', async (req, res) => {
+  if (!page) {
+    return res.status(503).json({ error: 'Browser not initialized' });
+  }
+  let url = req.body.url;
+  if (!url) {
+    return res.status(400).json({ error: 'Missing url' });
+  }
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = 'https://' + url;
+  }
+  try {
+    broadcast({ type: 'navigation_start', url });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    const finalUrl = page.url();
+    const title = await page.title().catch(() => '');
+    broadcast({ type: 'navigation_complete', url: finalUrl, title });
+    res.json({ url: finalUrl, title, success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message, success: false });
+  }
+});
+
+// Click at coordinates
+app.post('/api/click', async (req, res) => {
+  if (!page) return res.status(503).json({ error: 'Browser not initialized' });
+  const { x, y } = req.body;
+  if (x === undefined || y === undefined) {
+    return res.status(400).json({ error: 'Missing x or y' });
+  }
+  try {
+    await page.mouse.click(x, y);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Type text
+app.post('/api/type', async (req, res) => {
+  if (!page) return res.status(503).json({ error: 'Browser not initialized' });
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: 'Missing text' });
+  try {
+    await page.keyboard.type(text, { delay: 20 });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Press key
+app.post('/api/keypress', async (req, res) => {
+  if (!page) return res.status(503).json({ error: 'Browser not initialized' });
+  const { key } = req.body;
+  if (!key) return res.status(400).json({ error: 'Missing key' });
+  try {
+    await page.keyboard.press(key);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Scroll
+app.post('/api/scroll', async (req, res) => {
+  if (!page) return res.status(503).json({ error: 'Browser not initialized' });
+  const { deltaX, deltaY } = req.body;
+  try {
+    await page.mouse.wheel(deltaX || 0, deltaY || 0);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Go back
+app.post('/api/go-back', async (req, res) => {
+  if (!page) return res.status(503).json({ error: 'Browser not initialized' });
+  try {
+    await page.goBack().catch(() => {});
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Go forward
+app.post('/api/go-forward', async (req, res) => {
+  if (!page) return res.status(503).json({ error: 'Browser not initialized' });
+  try {
+    await page.goForward().catch(() => {});
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Browser state
