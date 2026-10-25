@@ -48,12 +48,22 @@
   @media(max-width:520px){
     body{padding:28px 18px}
   }
+  /* 页面最底部的一行字 */
+  .bottom{
+    position:fixed;left:0;right:0;bottom:26px;z-index:1;
+    margin:0;padding:0 18px;
+    font-size:clamp(12px,1.5vw,15px);
+    line-height:1.6;font-weight:500;letter-spacing:.02em;
+    color:rgba(255,255,255,.8);
+    text-shadow:0 1px 8px rgba(0,0,0,.6);
+  }
 </style>
 </head>
 <body>
   <h1>404</h1>
   <p class="t1" id="title">404 啦！页面它跑丢了 (ﾉД`)</p>
   <p class="t2" id="desc">你找的页面可能被小猫咪叼走了喵～ (ฅ´ω`ฅ)</p>
+  <p class="bottom">孩子，回去写你的作业吧，这里没有你要找的东西</p>
 
 <script>
   var TITLES = [
