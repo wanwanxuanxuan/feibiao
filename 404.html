@@ -5,45 +5,69 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>404</title>
 <style>
-  :root{
-    --bg:#f6f7fb;--text:#1a1d29;--muted:#6b7280;
-    --primary:#6366f1;--primary-2:#8b5cf6;
-  }
-  @media (prefers-color-scheme: dark){
-    :root{--bg:#0e1018;--text:#e9eaf2;--muted:#9aa0b3}
-  }
   *{box-sizing:border-box}
   html,body{height:100%}
   body{
-    margin:0;background:var(--bg);color:var(--text);
+    margin:0;
     font-family:"Inter","Noto Sans SC",system-ui,-apple-system,"Segoe UI",sans-serif;
     display:flex;align-items:center;justify-content:center;
     padding:24px;position:relative;overflow:hidden;
+    background-color:#1b1d27;
+    background-image:url("/assets/404-bg.jpg"),linear-gradient(135deg,#2b2f45,#4b3b6b);
+    background-position:center;background-size:cover;background-repeat:no-repeat;
   }
+  /* 图片上的压暗层，保证文字可读 */
   body::before{
-    content:"";position:absolute;inset:0;z-index:-1;
-    background:
-      radial-gradient(55% 45% at 18% 12%, color-mix(in srgb,var(--primary) 20%,transparent), transparent 70%),
-      radial-gradient(50% 45% at 85% 85%, color-mix(in srgb,var(--primary-2) 18%,transparent), transparent 70%);
+    content:"";position:absolute;inset:0;z-index:0;
+    background:linear-gradient(180deg,rgba(10,12,20,.55),rgba(10,12,20,.65));
   }
-  .wrap{text-align:center;max-width:560px}
+  .wrap{
+    position:relative;z-index:1;text-align:center;max-width:620px;
+    padding:36px 30px;border-radius:20px;
+    background:rgba(18,20,30,.45);
+    border:1px solid rgba(255,255,255,.18);
+    box-shadow:0 20px 60px rgba(0,0,0,.35);
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  }
   h1{
     margin:0;
-    font-size:clamp(86px,18vw,150px);
-    line-height:1;font-weight:800;letter-spacing:-.04em;
-    background:linear-gradient(135deg,var(--primary),var(--primary-2));
-    -webkit-background-clip:text;background-clip:text;color:transparent;
+    font-size:clamp(22px,3.4vw,38px);
+    line-height:1.45;font-weight:800;letter-spacing:.01em;
+    color:#fff;
+    text-shadow:0 2px 12px rgba(0,0,0,.45);
   }
   p{
-    margin:18px 0 0;font-size:clamp(15px,2.2vw,18px);
-    color:var(--muted);line-height:1.8;font-weight:500;
+    margin:16px 0 0;
+    font-size:clamp(14px,1.9vw,18px);
+    line-height:1.9;font-weight:500;
+    color:rgba(255,255,255,.9);
+    text-shadow:0 1px 8px rgba(0,0,0,.4);
   }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>404</h1>
-    <p>暂时没有你查找的页面欧（QwQ）</p>
+    <h1 id="title">404 啦！页面它跑丢了 (ﾉД`)</h1>
+    <p id="desc">你找的页面可能被小猫咪叼走了喵～ (ฅ´ω`ฅ)</p>
   </div>
+
+<script>
+  var TITLES = [
+    '404 啦！页面它跑丢了 (ﾉД`)',
+    '哎呀……这个页面好像不存在呢 (´；ω；`)',
+    'Oops！404 出没注意！(QwQ)',
+    '页面走丢了，正在哭唧唧 (ᗒᗣᗕ)՞'
+  ];
+  var DESCS = [
+    '你找的页面可能被小猫咪叼走了喵～ (ฅ´ω`ฅ)',
+    '呜呜……这个地址好像不太对劲呢 (QwQ)',
+    '页面它偷偷溜出去玩了，暂时找不到啦 (´･ω･`)',
+    '抱歉抱歉！这里什么都没有，空空如也～ (ＱωＱ)',
+    '这个页面可能已经搬家了，或者从来没存在过……(´；д；`)'
+  ];
+  function pick(arr){return arr[Math.floor(Math.random()*arr.length)]}
+  document.getElementById('title').textContent = pick(TITLES);
+  document.getElementById('desc').textContent = pick(DESCS);
+</script>
 </body>
 </html>
