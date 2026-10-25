@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>智学云 · 选择进入端</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css?v=5">
+<style>
+  .portal{
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:28px;padding:40px 20px;position:relative;
+        }
+  .portal::before{
+    content:'';position:absolute;inset:0;z-index:-1;
+    background:
+      radial-gradient(60% 50% at 15% 15%, color-mix(in srgb,var(--primary) 18%,transparent), transparent 70%),
+      radial-gradient(50% 45% at 85% 80%, color-mix(in srgb,var(--primary-2) 16%,transparent), transparent 70%);
+  }
+  .portal-head{display:flex;align-items:center;gap:14px}
+  .portal-mark{
+    width:56px;height:56px;border-radius:16px;font-size:28px;
+    background:linear-gradient(135deg,var(--primary),var(--primary-2));
+    display:flex;align-items:center;justify-content:center;box-shadow:0 10px 26px var(--ring);
+  }
+  .portal-title{font-weight:800;font-size:26px;letter-spacing:-.02em}
+  .portal-sub{font-size:13px;color:var(--muted);margin-top:2px}
+  .role-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;width:100%;max-width:880px}
+  @media(max-width:780px){.role-cards{grid-template-columns:1fr;max-width:420px}}
+  .role-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px 20px;
+    text-align:center;cursor:pointer;font-family:inherit;color:var(--text);transition:all .2s;
+    display:flex;flex-direction:column;align-items:center;gap:9px;
+  }
+  .role-card:hover{transform:translateY(-4px);border-color:var(--primary);box-shadow:0 16px 34px rgba(0,0,0,.12)}
+  .role-card .em{font-size:40px;line-height:1}
+  .role-card .nm{font-weight:800;font-size:17px}
+  .role-card .ds{font-size:12px;color:var(--muted);line-height:1.6}
+  .role-card .tag{margin-top:4px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--surface-2);color:var(--primary)}
+  .portal-foot{font-size:12px;color:var(--muted);text-align:center;line-height:1.9}
+  .portal-reset{
+    background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:inherit;
+    text-decoration:underline;text-underline-offset:3px;
+  }
+  .portal-reset:hover{color:var(--primary)}
+  .last-tip{font-size:12px;color:var(--muted);background:var(--surface);border:1px dashed var(--border);border-radius:999px;padding:6px 14px}
+</style>
+</head>
+<body>
+  <div class="portal">
+    <div class="portal-head">
+      <div class="portal-mark">🎓</div>
+      <div>
+        <div class="portal-title">智学云</div>
+        <div class="portal-sub">校园管理任务工作台 · 请选择进入端</div>
+      </div>
+    </div>
+
+    <div class="last-tip" id="memTip" style="display:none">已记住你上次的选择，将自动进入（可点击下方按钮取消）</div>
+
+    <div class="role-cards">
+      <button class="role-card" data-role="teacher">
+        <span class="em">👨‍🏫</span>
+        <span class="nm">老师端</span>
+        <span class="ds">管理课程表 / 布置作业 / 录入成绩 / 发布通知</span>
+        <span class="tag">需密码</span>
+      </button>
+      <button class="role-card" data-role="student">
+        <span class="em">🧑‍🎓</span>
+        <span class="nm">学生端</span>
+        <span class="ds">查看课程与作业 / 勾选完成进度 / 番茄钟与笔记</span>
+        <span class="tag">免密码</span>
+      </button>
+      <button class="role-card" data-role="parent">
+        <span class="em">👨‍👩‍👧</span>
+        <span class="nm">家长端</span>
+        <span class="ds">查看孩子课程表 / 作业进度 / 成绩与家校通知</span>
+        <span class="tag">需密码</span>
+      </button>
+    </div>
+
+    <div class="portal-foot">
+      老师端 / 家长端需密码（初始密码 123456，可在「设置」中修改）<br>
+      <button class="portal-reset" id="resetBtn">忘记选择 · 不再自动进入</button>
+    </div>
+  </div>
+
+<script>
+const KEY='studyhub_role', PAGES={teacher:'../teacher.html',student:'../student.html',parent:'../parent.html'};
+function readRole(){try{const v=JSON.parse(localStorage.getItem(KEY));return typeof v==='string'?v:null}catch(e){return localStorage.getItem(KEY)}}
+function writeRole(r){localStorage.setItem(KEY,JSON.stringify(r))}
+try{const raw=localStorage.getItem('studyhub_v1');if(raw&&JSON.parse(raw).theme==='dark')document.documentElement.classList.add('dark')}catch(e){}
+const last=readRole();
+const forceChoose=new URLSearchParams(location.search).get('choose')==='1';
+if(last&&PAGES[last]&&!forceChoose){location.replace(PAGES[last]);}
+document.querySelectorAll('[data-role]').forEach(el=>{
+  el.addEventListener('click',()=>{const r=el.dataset.role;writeRole(r);location.href=PAGES[r];});
+});
+const mt=document.getElementById('memTip');
+if(mt&&last&&PAGES[last])mt.style.display='';
+const rb=document.getElementById('resetBtn');
+if(rb)rb.addEventListener('click',()=>{localStorage.removeItem(KEY);if(mt)mt.style.display='none';});
+</script>
+</body>
+</html>
