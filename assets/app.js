@@ -2,7 +2,7 @@
 /* 重要：每次修改 app.js 或 style.css 后，必须同步提升各 HTML 中引用的 ?v= 版本号。
    GitHub Pages 对静态资源返回 cache-control: max-age=14400（4 小时），
    不加版本号会导致用户浏览器长时间继续运行旧脚本。 */
-const APP_VERSION='7';
+const APP_VERSION='8';
 
 /* ============ 同步状态指示 ============ */
 function setSyncStatus(state){
@@ -258,11 +258,12 @@ window.addEventListener('storage',(e)=>{
 /* ============ GitHub 仓库文件同步引擎 ============ */
 ghSync={
   cfg:Object.assign({},GH_DEFAULTS,DB.get(GH_CFG_KEY,null)||{}),
-  sha:null, pushTimer:null, pollTimer:null, pushing:false, pulling:false, applying:false, lastPull:0,
+  sha:null, pushTimer:null, pollTimer:null, pushing:false, pulling:false, applying:false, lastPull:0, backoffUntil:0,
   token(){return DBraw(GH_TOKEN_KEY,'')},
   setToken(t){DBrawSet(GH_TOKEN_KEY,t||'')},
   saveCfg(c){this.cfg=Object.assign({},GH_DEFAULTS,c||{});DBrawSet(GH_CFG_KEY,this.cfg)},
-  ready(){return !!(this.cfg.owner&&this.cfg.repo&&this.token())},
+  ready(){return !!(this.cfg.owner&&this.cfg.repo&&this.token())},      // 可写：需要令牌
+  configured(){return !!(this.cfg.owner&&this.cfg.repo)},              // 可读：公开仓库无需令牌
   apiUrl(){
     const {owner,repo,path,branch}=this.cfg;
     const qs=[];if(branch)qs.push('ref='+encodeURIComponent(branch));
@@ -276,32 +277,51 @@ ghSync={
     return h;
   },
   start(){
-    if(!this.ready()){setSyncStatus('unconfigured');return}
+    if(!this.configured()){setSyncStatus('unconfigured');return}
     clearInterval(this.pollTimer);
     this.pull(true);
-    this.pollTimer=setInterval(()=>{if(document.visibilityState==='visible')this.pull()},20000);
+    // 有令牌：授权接口 5,000 次/时，10 秒一轮；无令牌：公开接口限流较严，90 秒一轮
+    const every=this.token()?10000:90000;
+    this.pollTimer=setInterval(()=>{
+      if(document.visibilityState!=='visible')return;
+      if(Date.now()<this.backoffUntil)return;
+      this.pull();
+    },every);
   },
   stop(){clearInterval(this.pollTimer);this.pollTimer=null;setSyncStatus('unconfigured')},
   /* 拉取远端 → 远端更新时间更晚则覆盖本地，否则把本地推上去 */
   async pull(initial){
-    if(!this.ready()||this.pulling)return;
+    if(!this.configured()||this.pulling)return;
     this.pulling=true;
     if(initial)setSyncStatus('syncing');
     try{
       const res=await fetch(this.apiUrl()+'&_='+Date.now(),{headers:this.headers(),cache:'no-store'});
-      if(res.status===404){ // 文件不存在 → 创建
-        this.sha=null;this.pulling=false,this.pushing=false;await this.push();return;
+      if(res.status===404){ // 文件不存在 → 创建（仅持有令牌时可写）
+        this.sha=null;this.pulling=false;
+        if(this.token()){this.pushing=false;await this.push();}
+        else setSyncStatus('unconfigured');
+        return;
       }
-      if(res.status===401||res.status===403)throw new Error('令牌无效或权限不足');
+      if(res.status===401)throw new Error('令牌无效或权限不足');
+      if(res.status===403||res.status===429){ // 未授权时多为限流，退避 5 分钟
+        if(!this.token()){
+          this.backoffUntil=Date.now()+300000;
+          try{await this.pullRaw(initial);return}
+          catch(e2){console.warn('兜底读取失败：',e2.message)}
+          throw new Error('公开接口限流，稍后重试');
+        }
+        throw new Error('令牌无效或权限不足');
+      }
       if(!res.ok)throw new Error('HTTP '+res.status);
       const info=await res.json();
       this.sha=info.sha;
       const payload=JSON.parse(this.decode(info.content));
       this.lastPull=Date.now();
+      this.backoffUntil=0;
       if(payload&&payload.data){
         const remoteAt=+(payload.updatedAt||0);
         const localAt=+((store._meta&&store._meta.updatedAt)||0);
-        if(remoteAt>localAt)this.apply(payload);
+        if(remoteAt>localAt)this.apply(payload,!!initial);
         else if(localAt>remoteAt)this.push();
       }
       setSyncStatus('online');
@@ -311,8 +331,24 @@ ghSync={
     }
     finally{this.pulling=false}
   },
-  apply(payload){
+  /* 公开接口限流时的兜底：直接读仓库原始文件（CDN 最多缓存 5 分钟） */
+  async pullRaw(initial){
+    const {owner,repo,path,branch}=this.cfg;
+    const url=`https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(branch||'main')}/${path}?_=${Date.now()}`;
+    const res=await fetch(url,{cache:'no-store'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const payload=await res.json();
+    this.lastPull=Date.now();
+    if(payload&&payload.data){
+      const remoteAt=+(payload.updatedAt||0);
+      const localAt=+((store._meta&&store._meta.updatedAt)||0);
+      if(remoteAt>localAt)this.apply(payload,!!initial);
+    }
+    setSyncStatus('online');
+  },
+  apply(payload,silent){
     this.applying=true;
+    const before=noticeSnapshot(store);
     const tp=store.teacherPwd, pp=store.parentPwd;   // 老师/家长密码仅存本机，不随同步数据覆盖
     const myStudents=(store.students||[]).slice();   // 本机已登记的学生姓名
     store=Object.assign({},DEFAULT_STORE,payload.data);
@@ -325,6 +361,11 @@ ghSync={
     applyTheme();renderAll();updateGreeting();
     this.applying=false;
     toast('已同步其他设备的最新数据');
+    // 别的设备带来的新作业 / 通知 / 成绩 / 老师评价 → 顶部横幅提醒
+    if(!silent&&payload.device!==DEVICE_ID){
+      const items=noticeDiff(before,store);
+      if(items.length)wxAlert.push(items);
+    }
   },
   /* 本地改动 → 延迟合并后推送（防抖，避免频繁提交） */
   schedulePush(){
@@ -386,7 +427,89 @@ ghSync={
     this.sha=null;
   }
 };
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ghSync.ready())ghSync.pull()});
+/* ============ 新消息顶部提醒（微信风格） ============ */
+/* 只比较「别的设备」同步过来的数据；本机自己的修改不弹提示 */
+function noticeSnapshot(s){
+  const ids=a=>new Set((a||[]).map(x=>x&&x.id).filter(Boolean));
+  const rec={};
+  Object.keys(s.records||{}).forEach(n=>{
+    const r=s.records[n]||{};
+    rec[n]={advice:r.advice||'',scores:ids(r.scores)};
+  });
+  return {hw:ids(s.homework),nt:ids(s.notices),rec};
+}
+function noticeDiff(before,after){
+  const out=[];
+  let mine='';
+  try{if(currentRole!=='teacher'&&records&&records.me)mine=records.me()||''}catch(e){}
+  (after.homework||[]).forEach(h=>{
+    if(before.hw.has(h.id))return;
+    out.push({view:'homework',icon:'📚',title:'新作业',text:[h.subject?'['+h.subject+']':'',h.title].filter(Boolean).join(' ')});
+  });
+  (after.notices||[]).forEach(n=>{
+    if(before.nt.has(n.id))return;
+    out.push({view:'notices',icon:'🔔',title:'新通知',text:n.title||'（无标题）'});
+  });
+  // 成绩与老师评价只提醒本人 / 自己孩子；还没填姓名时先不提醒
+  if(currentRole!=='teacher'&&!mine)return out;
+  Object.keys(after.records||{}).forEach(name=>{
+    if(mine&&name!==mine)return;
+    const a=after.records[name]||{};
+    const b=before.rec[name]||{advice:'',scores:new Set()};
+    (a.scores||[]).forEach(sc=>{
+      if(b.scores.has(sc.id))return;
+      const full=+sc.full||0,score=+sc.score||0;
+      const pct=full>0?'（'+Math.round(score/full*100)+'%）':'';
+      out.push({view:'records',icon:'📊',title:'新成绩',text:`${name} · ${sc.subject||'成绩'} ${score}${full?'/'+full:''}${pct}`});
+    });
+    const na=a.advice||'', ba=b.advice||'';
+    if(na&&na!==ba)out.push({view:'records',icon:'💬',title:'老师评价',text:`${name}：${na}`});
+  });
+  return out;
+}
+const wxAlert={
+  queue:[],showing:false,timer:null,
+  stack(){
+    let el=document.getElementById('wxStack');
+    if(!el){el=document.createElement('div');el.id='wxStack';el.className='wx-stack';document.body.appendChild(el)}
+    return el;
+  },
+  push(items){
+    (items||[]).forEach(it=>this.queue.push(it));
+    if(this.showing||!this.queue.length)return;
+    this.next();
+  },
+  next(){
+    if(!this.queue.length){this.showing=false;return}
+    this.showing=true;
+    const it=this.queue.shift();
+    const el=document.createElement('div');
+    el.className='wx-pop';
+    el.innerHTML=`<div class="wx-ic">${it.icon||'🔔'}</div>
+      <div class="wx-body">
+        <div class="wx-title">${esc(it.title||'新消息')}</div>
+        <div class="wx-text">${esc(String(it.text||'').slice(0,80))}</div>
+      </div>
+      <div class="wx-close" aria-label="关闭">×</div>`;
+    el.addEventListener('click',()=>{
+      if(it.view&&typeof navTo==='function')navTo(it.view);
+      this.hide(el);
+    });
+    this.stack().appendChild(el);
+    requestAnimationFrame(()=>el.classList.add('show'));
+    clearTimeout(this.timer);
+    this.timer=setTimeout(()=>this.hide(el),4500);
+  },
+  hide(el){
+    if(!el||el._closing)return;
+    el._closing=true;
+    clearTimeout(this.timer);
+    el.classList.remove('show');
+    setTimeout(()=>{el.remove();this.next()},280);
+  }
+};
+
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ghSync.configured())ghSync.pull()});
 
 /* 启动同步 */
 ghSync.start();
@@ -480,8 +603,10 @@ const syncSettings={
   open(){
     const c=ghSync.cfg, token=ghSync.token();
     const status=ghSync.ready()
-      ? '<span style="color:var(--success)">● 已开启 · 每 20 秒自动拉取</span>'
-      : '<span style="color:var(--muted)">● 未开启 · 仅本地存储</span>';
+      ? '<span style="color:var(--success)">● 已开启 · 每 10 秒自动更新</span>'
+      : (ghSync.configured()
+          ? '<span style="color:var(--success)">● 只读同步 · 每 90 秒自动接收更新（未填令牌，仅能接收）</span>'
+          : '<span style="color:var(--muted)">● 未开启 · 仅本地存储</span>');
     openModal('设置',`
       <div style="display:grid;gap:14px">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -510,6 +635,7 @@ const syncSettings={
           <div style="font-size:13px;line-height:1.7;background:var(--surface-2);padding:12px;border-radius:10px">
             <div style="font-weight:700;margin-bottom:6px">同步状态：${status}</div>
             数据保存在 GitHub 仓库的一个 JSON 文件里，老师 / 学生 / 家长各端读写同一文件即可同步。
+            有新作业、通知、成绩或老师评价时，会在屏幕上方弹出提醒。
             <div style="font-size:11px;color:var(--muted);margin-top:6px">页面版本 v${APP_VERSION} · 若与最新版号不符，请强制刷新页面（⌘⇧R / Ctrl+F5）</div>
           </div>
         </div>

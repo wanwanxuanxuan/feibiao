@@ -352,3 +352,48 @@
 
   /* dark mode note cards */
   html.dark .note-card{filter:brightness(.84)}
+
+  /* 顶部新消息提醒（微信风格） */
+  .wx-stack{
+    position:fixed;top:0;left:0;right:0;z-index:1200;
+    display:flex;flex-direction:column;align-items:center;gap:8px;
+    padding:10px 12px;pointer-events:none;
+  }
+  .wx-pop{
+    pointer-events:auto;width:100%;max-width:420px;
+    display:flex;align-items:flex-start;gap:11px;
+    background:rgba(255,255,255,.97);color:#16151c;
+    border:1px solid rgba(20,15,40,.06);border-radius:14px;
+    padding:12px 13px;
+    box-shadow:0 12px 34px rgba(12,10,28,.28),0 2px 8px rgba(12,10,28,.14);
+    transform:translateY(-130%);opacity:0;
+    transition:transform .34s cubic-bezier(.22,1,.36,1),opacity .26s ease;
+    cursor:pointer;
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  }
+  .wx-pop.show{transform:translateY(0);opacity:1}
+  html.dark .wx-pop{background:rgba(32,29,44,.97);color:#f3f1fb;border-color:rgba(255,255,255,.07)}
+  .wx-pop .wx-ic{
+    width:36px;height:36px;border-radius:10px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:18px;
+    background:linear-gradient(135deg,var(--primary),var(--primary-2));
+    color:#fff;box-shadow:0 4px 12px var(--ring);
+  }
+  .wx-pop .wx-body{flex:1;min-width:0;padding-top:1px}
+  .wx-pop .wx-title{font-size:13.5px;font-weight:800;letter-spacing:-.01em;display:flex;align-items:center;gap:6px}
+  .wx-pop .wx-title:before{content:'';width:6px;height:6px;border-radius:50%;background:var(--primary);flex-shrink:0}
+  .wx-pop .wx-text{
+    font-size:12.5px;line-height:1.55;color:#5f5a75;margin-top:3px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  html.dark .wx-pop .wx-text{color:#b7b1cc}
+  .wx-pop .wx-close{
+    width:22px;height:22px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1;
+    color:#8a849c;transition:background .15s;
+  }
+  .wx-pop .wx-close:hover{background:rgba(120,120,160,.14)}
+  @media(max-width:560px){
+    .wx-stack{padding:8px}
+    .wx-pop{max-width:none}
+  }
