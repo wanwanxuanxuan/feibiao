@@ -2,7 +2,7 @@
 /* 重要：每次修改 app.js 或 style.css 后，必须同步提升各 HTML 中引用的 ?v= 版本号。
    GitHub Pages 对静态资源返回 cache-control: max-age=14400（4 小时），
    不加版本号会导致用户浏览器长时间继续运行旧脚本。 */
-const APP_VERSION='8';
+const APP_VERSION='9';
 
 /* ============ 同步状态指示 ============ */
 function setSyncStatus(state){
@@ -41,7 +41,8 @@ const DB = {
 };
 const DEFAULT_STORE = {
   tasks:[], schedule:[], grades:[], notes:[], countdowns:[], pomoLog:[], theme:'light',
-  homework:[], notices:[], students:[], records:{}, teacherPwd:null, parentPwd:null, _meta:null
+  homework:[], notices:[], students:[], records:{}, teacherPwd:null, parentPwd:null,
+  pwdPolicy:{}, removedStudents:{}, notifyEnabled:true, _meta:null
 };
 let store = {...DEFAULT_STORE, ...DB.get(DB.key, {})};
 // 确保所有字段存在
@@ -70,12 +71,18 @@ const ROLE_META = {
   student:{name:'学生',icon:'🧑‍🎓',greet:'同学'},
   parent:{name:'家长',icon:'👨‍👩‍👧',greet:'家长'}
 };
-/* 老师端 / 家长端进入时均需密码；初始密码 123456，可自行修改 */
+/* 老师端 / 家长端进入时均需密码；密码可在管理后台统一设置 */
 const DEF_PWD='123456';
 const PROTECTED_ROLES=['teacher','parent'];
 const auth={
   protected(r){return PROTECTED_ROLES.indexOf(r)>=0},
-  pwd(r){return store[r+'Pwd']},
+  policy(r){return (store.pwdPolicy||{})[r]||null},
+  /* 本机保存的密码与管理后台下发的密码，取时间更新的一份 */
+  pwd(r){
+    const local=store[r+'Pwd'], pol=this.policy(r);
+    if(local&&pol)return (+pol.at||0)>(+local.at||0)?pol:local;
+    return local||pol||null;
+  },
   has(r){const p=this.pwd(r);return !!(p&&p.hash)},
   isDefault(r){const p=this.pwd(r);return !!(p&&p.hash==='default')},
   async hash(p){
@@ -91,11 +98,27 @@ const auth={
   },
   async verify(r,p){
     const P=this.pwd(r);if(!P||!P.hash)return false;
-    if(P.hash==='default')return p===DEF_PWD;      // 初始密码直接比对
+    if(P.hash==='default'){
+      const ini=this.policy('init');                 // 管理后台设置的统一默认密码
+      if(ini&&ini.hash)return (await this.hash(p))===ini.hash;
+      return p===DEF_PWD;
+    }
     return (await this.hash(p))===P.hash;
   },
-  async setPwd(r,p){store[r+'Pwd']={hash:await this.hash(p),at:Date.now()};save()},
-  resetPwd(r){store[r+'Pwd']={hash:'default',at:Date.now()};save()},   // 还原为初始密码
+  async setPwd(r,p){
+    const at=Date.now();
+    store[r+'Pwd']={hash:await this.hash(p),at};
+    store.pwdPolicy=store.pwdPolicy||{};
+    store.pwdPolicy[r]=store[r+'Pwd'];               // 同步到所有客户端
+    save();
+  },
+  resetPwd(r){
+    const at=Date.now();
+    store[r+'Pwd']={hash:'default',at};
+    store.pwdPolicy=store.pwdPolicy||{};
+    store.pwdPolicy[r]={hash:'default',at};
+    save();
+  },
   unlocked(r){return sessionStorage.getItem('zhixueyun_unlock_'+r)==='1'},
   unlock(r){sessionStorage.setItem('zhixueyun_unlock_'+r,'1')},
   /* 全屏密码锁定层 */
@@ -103,7 +126,7 @@ const auth={
     auth._lockRole=r;
     const m=ROLE_META[r];
     document.getElementById('lockTitle').textContent=m.name+'端已加密';
-    document.getElementById('lockTip').textContent='请输入'+m.name+'端密码以继续（初始密码 '+DEF_PWD+'）';
+    document.getElementById('lockTip').textContent='请输入'+m.name+'端密码以继续';
     document.getElementById('lockBtn').textContent='解锁';
     const p2=document.getElementById('lockPwd2');p2.style.display='none';p2.value='';
     document.getElementById('lockPwd').value='';
@@ -167,6 +190,7 @@ const persona={
     const v=(el?el.value:'').trim();
     if(!v){toast('请填写姓名');return}
     this.set('student',v);
+    if(store.removedStudents&&store.removedStudents[v])delete store.removedStudents[v];   // 重新登记则撤销删除标记
     if(!(store.students||[]).includes(v)){store.students=(store.students||[]).concat(v);save()}
     closeModal(true);updateGreeting();
     toast('欢迎，'+v+'同学');
@@ -349,13 +373,17 @@ ghSync={
   apply(payload,silent){
     this.applying=true;
     const before=noticeSnapshot(store);
-    const tp=store.teacherPwd, pp=store.parentPwd;   // 老师/家长密码仅存本机，不随同步数据覆盖
+    const tp=store.teacherPwd, pp=store.parentPwd, lp=store.pwdPolicy;   // 老师/家长密码仅存本机，不随同步数据覆盖
     const myStudents=(store.students||[]).slice();   // 本机已登记的学生姓名
     store=Object.assign({},DEFAULT_STORE,payload.data);
     Object.keys(DEFAULT_STORE).forEach(k=>{if(store[k]===undefined)store[k]=DEFAULT_STORE[k]});
     store.teacherPwd=tp||null;store.parentPwd=pp||null;
-    // 学生名单取并集，避免某台设备刚登记的姓名被远端旧数据覆盖丢失
+    if(!store.pwdPolicy||!Object.keys(store.pwdPolicy).length)store.pwdPolicy=lp||{};
+    // 学生名单取并集，避免某台设备刚登记的姓名被远端旧数据覆盖丢失；
+    // 再剔除管理后台已删除的学生（removedStudents 删除标记）
     store.students=Array.from(new Set([...(store.students||[]),...myStudents]));
+    const gone=store.removedStudents||{};
+    if(Object.keys(gone).length)store.students=store.students.filter(n=>!gone[n]);
     store._meta={updatedAt:+payload.updatedAt||Date.now(),device:payload.device||'remote'};
     DB.set(DB.key,store);
     applyTheme();renderAll();updateGreeting();
@@ -475,6 +503,7 @@ const wxAlert={
     return el;
   },
   push(items){
+    if(store.notifyEnabled===false)return;   // 管理后台可关闭客户端提醒
     (items||[]).forEach(it=>this.queue.push(it));
     if(this.showing||!this.queue.length)return;
     this.next();
@@ -664,14 +693,14 @@ const syncSettings={
         <div style="border-top:1px solid var(--border);padding-top:14px">
           <div style="font-weight:700;font-size:13px">本端密码设置</div>
           ${currentRole==='student'
-            ? `<div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.7">学生端无需密码（首次进入填写姓名即可）。老师可在老师端的「学生档案 → 密码管理」里统一设置老师端与家长端的密码。</div>`
-            : `<div style="font-size:12px;color:var(--muted);margin:8px 0;line-height:1.7">这里只能修改本端（${ROLE_META[currentRole].name}端）的密码，不能修改其它端的密码。老师可在「学生档案 → 密码管理」里统一设置所有人的密码。</div>
+            ? `<div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.7">学生端无需密码（首次进入填写姓名即可）。密码由管理后台统一控制。</div>`
+            : `<div style="font-size:12px;color:var(--muted);margin:8px 0;line-height:1.7">这里只能修改本端（${ROLE_META[currentRole].name}端）的密码。管理后台可以统一控制所有账号的密码。</div>
                <div style="display:flex;gap:8px;flex-wrap:wrap">
                  <input class="input" id="pwd_self" type="password" placeholder="新密码（≥4 位）" style="flex:1;min-width:150px" autocomplete="off">
                  <button class="btn btn-ghost btn-sm" onclick="syncSettings.setPwd()">保存</button>
-                 <button class="btn btn-ghost btn-sm" onclick="syncSettings.resetPwd()">重置为 ${DEF_PWD}</button>
+                 <button class="btn btn-ghost btn-sm" onclick="syncSettings.resetPwd()">恢复默认密码</button>
                </div>
-               <div style="font-size:11px;color:var(--muted);margin-top:8px">当前：${auth.isDefault(currentRole)?`<span style="color:var(--warn)">初始密码 ${DEF_PWD}</span>`:(auth.has(currentRole)?'<span style="color:var(--success)">已自定义</span>':'<span style="color:var(--muted)">未设置</span>')}</div>`}
+               <div style="font-size:11px;color:var(--muted);margin-top:8px">当前：${auth.isDefault(currentRole)?`<span style="color:var(--warn)">使用默认密码</span>`:(auth.has(currentRole)?'<span style="color:var(--success)">已自定义</span>':'<span style="color:var(--muted)">未设置</span>')}</div>`}
         </div>
       </div>`,
       `<button class="btn btn-ghost" onclick="closeModal()">关闭</button>
@@ -720,9 +749,9 @@ const syncSettings={
     toast(ROLE_META[currentRole].name+'端密码已更新');closeModal();
   },
   resetPwd(){
-    if(!confirm(`确定将${ROLE_META[currentRole].name}端密码重置为初始密码 ${DEF_PWD}？`))return;
+    if(!confirm(`确定将${ROLE_META[currentRole].name}端密码恢复为默认密码？`))return;
     auth.resetPwd(currentRole);auth.unlock(currentRole);closeModal();
-    toast(ROLE_META[currentRole].name+'端密码已重置为 '+DEF_PWD);
+    toast(ROLE_META[currentRole].name+'端密码已恢复默认');
   },
   toggleTheme(){
     store.theme=store.theme==='dark'?'light':'dark';
@@ -1430,20 +1459,20 @@ const records={
       <div class="card card-pad">
         <div class="card-title"><span class="dot" style="background:var(--info)"></span>密码管理（所有人）</div>
         <div style="font-size:12px;color:var(--muted);margin:10px 0 14px;line-height:1.7">
-          老师可在这里统一设置所有人的密码。学生端无需密码（首次进入填姓名即可）。
+          可以在这里统一设置老师端与家长端的密码。学生端无需密码（首次进入填姓名即可）。
         </div>
         <div id="pwdRows">${['teacher','parent'].map(r=>{
-          const st=auth.isDefault(r)?'<span style="color:var(--warn)">初始密码 123456</span>'
+          const st=auth.isDefault(r)?'<span style="color:var(--warn)">使用默认密码</span>'
             :(auth.has(r)?'<span style="color:var(--success)">已自定义</span>':'<span style="color:var(--muted)">未设置</span>');
           return `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
             <div style="min-width:86px;font-weight:600;font-size:13px">${ROLE_META[r].name}端密码</div>
             <input class="input" id="rpwd_${r}" type="password" placeholder="新密码（≥4 位）" autocomplete="off" style="flex:1;min-width:150px">
             <button class="btn btn-ghost btn-sm" onclick="records.setPwd('${r}')">保存</button>
-            <button class="btn btn-ghost btn-sm" onclick="records.resetPwd('${r}')">重置为 ${DEF_PWD}</button>
+            <button class="btn btn-ghost btn-sm" onclick="records.resetPwd('${r}')">恢复默认</button>
           </div><div style="font-size:11px;color:var(--muted);margin:-6px 0 12px 94px">当前：${st}</div>`;
         }).join('')}
         <div style="font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:10px;line-height:1.7">
-          说明：密码只以哈希形式保存在本设备浏览器，不会上传到 GitHub（仓库是公开的），所以这里设置的是「本设备上各端的密码」。
+          说明：密码以哈希形式保存，并随同步数据下发到所有客户端。更完整的账号控制请进入管理后台。
         </div>
       </div>`;
   },
@@ -1548,8 +1577,8 @@ const records={
     await auth.setPwd(r,v);this.render();toast(ROLE_META[r].name+'端密码已更新');
   },
   resetPwd(r){
-    if(!confirm(`确定将${ROLE_META[r].name}端密码重置为初始密码 ${DEF_PWD}？`))return;
-    auth.resetPwd(r);this.render();toast(ROLE_META[r].name+'端密码已重置为 '+DEF_PWD);
+    if(!confirm(`确定将${ROLE_META[r].name}端密码恢复为默认密码？`))return;
+    auth.resetPwd(r);this.render();toast(ROLE_META[r].name+'端密码已恢复默认');
   },
   /* ---------- 家长 / 学生：只读详情 ---------- */
   detailHtml(name){
@@ -1877,7 +1906,7 @@ const dashboard={
   }
 };
 
-/* ============ 初始化：不含任何初始数据；老师/家长端密码默认 123456 ============ */
+/* ============ 初始化：不含任何初始数据 ============ */
 function purgeDemoData(){
   const MD='zhixueyun_no_demo_v1';
   if(localStorage.getItem(MD)==='1')return;
@@ -1899,6 +1928,7 @@ function ensurePwdDefaults(){
   PROTECTED_ROLES.forEach(r=>{
     if(!store[r+'Pwd']){store[r+'Pwd']={hash:'default',at:0};changed=true}
   });
+  if(!store.pwdPolicy||typeof store.pwdPolicy!=='object'){store.pwdPolicy={};changed=true}
   if(changed)DB.set(DB.key,store);
 }
 purgeDemoData();
