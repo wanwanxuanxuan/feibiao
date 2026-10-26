@@ -183,7 +183,7 @@
           <div class="acct-form">
             <input class="input" id="pwd_teacher" type="password" placeholder="设置新密码（至少 4 位）" autocomplete="new-password">
             <button class="btn btn-primary btn-sm" data-pwd-set="teacher">保存</button>
-            <button class="btn btn-ghost btn-sm" data-pwd-reset="teacher">恢复默认</button>
+            <button class="btn btn-ghost btn-sm" data-pwd-reset="teacher">重置</button>
           </div>
         </div>
       </div>
@@ -199,7 +199,7 @@
           <div class="acct-form">
             <input class="input" id="pwd_parent" type="password" placeholder="设置新密码（至少 4 位）" autocomplete="new-password">
             <button class="btn btn-primary btn-sm" data-pwd-set="parent">保存</button>
-            <button class="btn btn-ghost btn-sm" data-pwd-reset="parent">恢复默认</button>
+            <button class="btn btn-ghost btn-sm" data-pwd-reset="parent">重置</button>
           </div>
         </div>
       </div>
@@ -215,18 +215,18 @@
           <div class="acct-form">
             <input class="input" id="pwd_admin" type="password" placeholder="设置新密码（至少 4 位）" autocomplete="new-password">
             <button class="btn btn-primary btn-sm" data-pwd-set="admin">保存</button>
-            <button class="btn btn-ghost btn-sm" data-pwd-reset="admin">恢复默认</button>
+            <button class="btn btn-ghost btn-sm" data-pwd-reset="admin">重置</button>
           </div>
         </div>
       </div>
 
       <div class="card card-pad">
-        <div class="card-title"><span class="dot" style="background:var(--warn)"></span>所有人的统一默认密码</div>
-        <div class="muted" style="margin-bottom:12px">未单独设置密码的账号都会使用这个统一密码。设置后不会在任何页面显示密码内容。</div>
+        <div class="card-title"><span class="dot" style="background:var(--warn)"></span>统一密码</div>
+        <div class="muted" style="margin-bottom:12px">未单独设置密码的账号都会使用这个统一密码。密码仅以哈希形式保存，不会在任何页面显示。</div>
         <div class="acct-form">
-          <input class="input" id="initPwd" type="password" placeholder="设置统一默认密码（至少 4 位）" autocomplete="new-password">
-          <button class="btn btn-primary btn-sm" id="initPwdBtn">保存默认密码</button>
-          <button class="btn btn-ghost btn-sm" id="resetAllPwdBtn">全部账号恢复默认</button>
+          <input class="input" id="initPwd" type="password" placeholder="设置统一密码（至少 4 位）" autocomplete="new-password">
+          <button class="btn btn-primary btn-sm" id="initPwdBtn">保存统一密码</button>
+          <button class="btn btn-ghost btn-sm" id="resetAllPwdBtn">全部账号使用统一密码</button>
         </div>
         <div class="muted" id="initPwdState" style="margin-top:10px"></div>
       </div>
@@ -402,12 +402,12 @@ function roleState(role){
   if(role==='admin'){
     const p=(store.pwdPolicy||{}).admin;
     if(!p)return {text:'跟随老师端密码',cls:'state-mute'};
-    if(p.hash==='default')return {text:'使用默认密码',cls:'state-warn'};
+    if(p.hash==='default')return {text:'未单独设置',cls:'state-mute'};
     return {text:'已自定义',cls:'state-ok'};
   }
   const p=effPwd(role);
   if(!p||!p.hash)return {text:'未设置',cls:'state-mute'};
-  if(p.hash==='default')return {text:'使用默认密码',cls:'state-warn'};
+  if(p.hash==='default')return {text:'未单独设置',cls:'state-mute'};
   return {text:'已自定义',cls:'state-ok'};
 }
 async function checkHash(hash,p){
@@ -423,7 +423,7 @@ async function adminVerify(p){
   const pol=store.pwdPolicy||{};
   if(pol.admin&&pol.admin.hash)return checkHash(pol.admin.hash,p);
   if(pol.teacher&&pol.teacher.hash&&await checkHash(pol.teacher.hash,p))return true;
-  return checkHash('default',p);   // 未单独设置管理密码时，统一默认密码也可进入
+  return checkHash('default',p);   // 未单独设置管理密码时，统一密码也可进入
 }
 async function setRolePwd(role){
   const input=$('pwd_'+role);
@@ -440,36 +440,36 @@ async function setRolePwd(role){
   toast(role==='admin'?'管理密码已更新':(role==='teacher'?'老师端密码已更新':'家长端密码已更新'));
 }
 function resetRolePwd(role){
-  if(!confirm('确定恢复该账号的默认密码？'))return;
+  if(!confirm('确定重置该账号密码？'))return;
   const at=Date.now();
   store.pwdPolicy=store.pwdPolicy||{};
   store.pwdPolicy[role]={hash:'default',at};
   if(role!=='admin')store[role+'Pwd']={hash:'default',at};
-  save();render();toast('已恢复默认密码');
+  save();render();toast('已重置为统一密码');
 }
 async function setInitPwd(){
   const el=$('initPwd');
   const v=(el&&el.value)||'';
-  if(v.length<4){toast('统一默认密码至少 4 位');return}
+  if(v.length<4){toast('统一密码至少 4 位');return}
   store.pwdPolicy=store.pwdPolicy||{};
   store.pwdPolicy.init={hash:await hashPwd(v),at:Date.now()};
   save();
   if(el)el.value='';
-  if(confirm('是否同时把所有账号恢复为统一默认密码？')){
+  if(confirm('是否同时让所有账号都使用这个统一密码？')){
     resetAllPwd(true);
   }else{
-    render();toast('统一默认密码已更新');
+    render();toast('统一密码已更新');
   }
 }
 function resetAllPwd(silent){
-  if(!silent&&!confirm('确定把老师端、家长端和管理员账号全部恢复为统一默认密码？'))return;
+  if(!silent&&!confirm('确定让老师端、家长端和管理员账号全部使用统一密码？'))return;
   const at=Date.now();
   store.pwdPolicy=store.pwdPolicy||{};
   ['teacher','parent','admin'].forEach(r=>{
     store.pwdPolicy[r]={hash:'default',at};
     if(r!=='admin')store[r+'Pwd']={hash:'default',at};
   });
-  save();render();toast('全部账号已恢复默认密码');
+  save();render();toast('全部账号已使用统一密码');
 }
 
 /* ================= 学生与家长 ================= */
@@ -785,8 +785,8 @@ function renderAccounts(){
   });
   const ini=policyInit();
   $('initPwdState').innerHTML=ini&&ini.hash
-    ? '统一默认密码：<span class="state-ok">已设置</span>'
-    : '统一默认密码：<span class="state-mute">未单独设置</span>';
+    ? '统一密码：<span class="state-ok">已设置</span>'
+    : '统一密码：<span class="state-mute">未单独设置</span>';
 }
 function renderStudents(){
   const names=studentNames();

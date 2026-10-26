@@ -2,7 +2,7 @@
 /* 重要：每次修改 app.js 或 style.css 后，必须同步提升各 HTML 中引用的 ?v= 版本号。
    GitHub Pages 对静态资源返回 cache-control: max-age=14400（4 小时），
    不加版本号会导致用户浏览器长时间继续运行旧脚本。 */
-const APP_VERSION='9';
+const APP_VERSION='10';
 
 /* ============ 同步状态指示 ============ */
 function setSyncStatus(state){
@@ -99,7 +99,7 @@ const auth={
   async verify(r,p){
     const P=this.pwd(r);if(!P||!P.hash)return false;
     if(P.hash==='default'){
-      const ini=this.policy('init');                 // 管理后台设置的统一默认密码
+      const ini=this.policy('init');                 // 管理后台设置的统一密码
       if(ini&&ini.hash)return (await this.hash(p))===ini.hash;
       return p===DEF_PWD;
     }
@@ -698,9 +698,9 @@ const syncSettings={
                <div style="display:flex;gap:8px;flex-wrap:wrap">
                  <input class="input" id="pwd_self" type="password" placeholder="新密码（≥4 位）" style="flex:1;min-width:150px" autocomplete="off">
                  <button class="btn btn-ghost btn-sm" onclick="syncSettings.setPwd()">保存</button>
-                 <button class="btn btn-ghost btn-sm" onclick="syncSettings.resetPwd()">恢复默认密码</button>
+                 <button class="btn btn-ghost btn-sm" onclick="syncSettings.resetPwd()">重置</button>
                </div>
-               <div style="font-size:11px;color:var(--muted);margin-top:8px">当前：${auth.isDefault(currentRole)?`<span style="color:var(--warn)">使用默认密码</span>`:(auth.has(currentRole)?'<span style="color:var(--success)">已自定义</span>':'<span style="color:var(--muted)">未设置</span>')}</div>`}
+               <div style="font-size:11px;color:var(--muted);margin-top:8px">当前：${auth.isDefault(currentRole)?`<span style="color:var(--muted)">未单独设置</span>`:(auth.has(currentRole)?'<span style="color:var(--success)">已自定义</span>':'<span style="color:var(--muted)">未设置</span>')}</div>`}
         </div>
       </div>`,
       `<button class="btn btn-ghost" onclick="closeModal()">关闭</button>
@@ -749,9 +749,9 @@ const syncSettings={
     toast(ROLE_META[currentRole].name+'端密码已更新');closeModal();
   },
   resetPwd(){
-    if(!confirm(`确定将${ROLE_META[currentRole].name}端密码恢复为默认密码？`))return;
+    if(!confirm(`确定将${ROLE_META[currentRole].name}端密码重置？`))return;
     auth.resetPwd(currentRole);auth.unlock(currentRole);closeModal();
-    toast(ROLE_META[currentRole].name+'端密码已恢复默认');
+    toast(ROLE_META[currentRole].name+'端密码已重置');
   },
   toggleTheme(){
     store.theme=store.theme==='dark'?'light':'dark';
@@ -1462,13 +1462,13 @@ const records={
           可以在这里统一设置老师端与家长端的密码。学生端无需密码（首次进入填姓名即可）。
         </div>
         <div id="pwdRows">${['teacher','parent'].map(r=>{
-          const st=auth.isDefault(r)?'<span style="color:var(--warn)">使用默认密码</span>'
+          const st=auth.isDefault(r)?'<span style="color:var(--muted)">未单独设置</span>'
             :(auth.has(r)?'<span style="color:var(--success)">已自定义</span>':'<span style="color:var(--muted)">未设置</span>');
           return `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
             <div style="min-width:86px;font-weight:600;font-size:13px">${ROLE_META[r].name}端密码</div>
             <input class="input" id="rpwd_${r}" type="password" placeholder="新密码（≥4 位）" autocomplete="off" style="flex:1;min-width:150px">
             <button class="btn btn-ghost btn-sm" onclick="records.setPwd('${r}')">保存</button>
-            <button class="btn btn-ghost btn-sm" onclick="records.resetPwd('${r}')">恢复默认</button>
+            <button class="btn btn-ghost btn-sm" onclick="records.resetPwd('${r}')">重置</button>
           </div><div style="font-size:11px;color:var(--muted);margin:-6px 0 12px 94px">当前：${st}</div>`;
         }).join('')}
         <div style="font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:10px;line-height:1.7">
@@ -1577,8 +1577,8 @@ const records={
     await auth.setPwd(r,v);this.render();toast(ROLE_META[r].name+'端密码已更新');
   },
   resetPwd(r){
-    if(!confirm(`确定将${ROLE_META[r].name}端密码恢复为默认密码？`))return;
-    auth.resetPwd(r);this.render();toast(ROLE_META[r].name+'端密码已恢复默认');
+    if(!confirm(`确定将${ROLE_META[r].name}端密码重置？`))return;
+    auth.resetPwd(r);this.render();toast(ROLE_META[r].name+'端密码已重置');
   },
   /* ---------- 家长 / 学生：只读详情 ---------- */
   detailHtml(name){
