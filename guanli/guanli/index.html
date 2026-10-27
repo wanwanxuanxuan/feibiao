@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>管理后台 · 智学云</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/style.css?v=6">
+<style>
+  body{min-height:100vh}
+  .admin-gate{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;padding:24px;
+    background:radial-gradient(60% 50% at 15% 12%, color-mix(in srgb,var(--primary) 20%,transparent), transparent 70%),
+               radial-gradient(50% 45% at 85% 85%, color-mix(in srgb,var(--primary-2) 18%,transparent), transparent 70%),
+               var(--bg)}
+  .gate-card{width:100%;max-width:370px;background:var(--surface);border:1px solid var(--border);border-radius:20px;
+    padding:30px 26px;text-align:center;box-shadow:0 26px 70px rgba(15,12,30,.22)}
+  .gate-em{font-size:38px;line-height:1}
+  .gate-card h1{font-size:22px;font-weight:800;margin:12px 0 6px;letter-spacing:-.02em}
+  .gate-card p{font-size:13px;color:var(--muted);margin:0 0 18px}
+  .gate-card .input{text-align:center}
+  .gate-err{color:var(--danger);font-size:12px;min-height:18px;margin:8px 0 4px}
+  .gate-card .btn{width:100%;margin-top:2px;justify-content:center}
+  .gate-back{display:inline-block;margin-top:16px;font-size:12px;color:var(--muted);text-decoration:none}
+  .gate-back:hover{color:var(--primary)}
+
+  .admin-shell{display:flex;min-height:100vh}
+  .side{width:230px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);
+    position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:18px;padding:18px 14px;z-index:30}
+  .side-brand{display:flex;align-items:center;gap:10px;padding:2px 6px}
+  .side-mark{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;
+    background:linear-gradient(135deg,var(--primary),var(--primary-2));box-shadow:0 6px 16px var(--ring)}
+  .side-name{font-weight:800;font-size:16px;line-height:1.2}
+  .side-sub{font-size:11px;color:var(--muted)}
+  .side nav{display:flex;flex-direction:column;gap:4px}
+  .nav-item{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:none;border-radius:10px;
+    background:none;color:var(--muted);font-family:inherit;font-size:13.5px;font-weight:600;text-align:left;cursor:pointer;transition:background .15s,color .15s}
+  .nav-item:hover{background:var(--surface-2);color:var(--text)}
+  .nav-item.active{background:linear-gradient(135deg,var(--primary),var(--primary-2));color:#fff;box-shadow:0 6px 16px var(--ring)}
+  .nav-item .em{font-size:15px;width:19px;text-align:center}
+  .side-foot{margin-top:auto;font-size:11px;color:var(--muted);padding:0 6px;line-height:1.7}
+
+  .main{flex:1;min-width:0;display:block;padding:22px 26px 64px}
+  .topbar{position:static;z-index:auto;background:none;backdrop-filter:none;-webkit-backdrop-filter:none;border-bottom:none;
+    display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:0;margin-bottom:20px}
+  .topbar h1{font-size:22px;font-weight:800;margin:0;letter-spacing:-.02em}
+  .topbar .sub{font-size:12px;color:var(--muted);margin-top:4px}
+  .top-actions{margin-left:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .sync-chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--muted);
+    background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:6px 12px;white-space:nowrap}
+  .sync-chip.on{color:var(--success);border-color:color-mix(in srgb,var(--success) 35%,var(--border))}
+  .sync-chip.err{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 35%,var(--border))}
+
+  .admin-view{display:none}
+  .admin-view.active{display:block;animation:fadeIn .22s ease}
+  .grid.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+  .muted{color:var(--muted);font-size:12px;line-height:1.7}
+  .field{margin-bottom:12px}
+  .field .lbl{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px}
+  .acct{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 0;border-bottom:1px solid var(--border)}
+  .acct:last-child{border-bottom:none}
+  .acct-name{font-weight:700;font-size:14px}
+  .acct-sub{font-size:12px;color:var(--muted);margin-top:3px}
+  .acct-form{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:260px}
+  .acct-form .input{flex:1;min-width:170px}
+  .state-ok{color:var(--success);font-weight:600}
+  .state-warn{color:var(--warn);font-weight:600}
+  .state-mute{color:var(--muted)}
+  .tbl-wrap{overflow-x:auto}
+  .admin-table{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
+  .admin-table th{text-align:left;color:var(--muted);font-weight:600;font-size:12px;padding:10px 8px;border-bottom:1px solid var(--border)}
+  .admin-table td{padding:11px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+  .admin-table td.ops{text-align:right;white-space:nowrap}
+  .admin-table td.ops .btn{margin-left:4px}
+  .row-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .row-actions .btn{justify-content:center}
+  .btn{justify-content:center}
+  .empty-tip{text-align:center;color:var(--muted);font-size:13px;padding:26px 10px}
+  .danger-line{border-top:1px solid var(--border);margin-top:14px;padding-top:14px}
+  .btn-danger{background:var(--danger);color:#fff;border:none}
+  .btn-danger:hover{filter:brightness(.93)}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:640px){.split{grid-template-columns:1fr}}
+  .sync-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .sync-status{font-size:12px;line-height:1.8;color:var(--muted);background:var(--surface-2);border-radius:10px;padding:12px;margin-top:12px;word-break:break-all}
+  .theme-opts{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 14px}
+  .theme-opt{display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  .theme-opt input{accent-color:var(--primary)}
+  .switch-line{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+  .switch-line:last-child{border-bottom:none}
+  .switch-line .name{font-size:13.5px;font-weight:700}
+  .switch-line .desc{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .switch-line input[type=checkbox]{width:42px;height:24px;accent-color:var(--primary);cursor:pointer}
+
+  @media(max-width:860px){
+    .admin-shell{flex-direction:column}
+    .side{position:sticky;top:0;width:100%;height:auto;flex-direction:column;align-items:stretch;gap:8px;
+      padding:10px 12px;border-right:none;border-bottom:1px solid var(--border);overflow:visible;z-index:50}
+    .side-brand{display:none}
+    .side-foot{display:none}
+    .side nav{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+    .nav-item{width:100%;justify-content:center;white-space:nowrap;padding:8px 4px;font-size:12px;gap:5px}
+    .nav-item .em{width:auto;font-size:13px}
+    .main{padding:14px 12px 50px}
+    .topbar h1{font-size:19px}
+    .top-actions{width:100%;justify-content:flex-start}
+    .admin-table{min-width:0}
+    .admin-table th,.admin-table td{padding:9px 5px;font-size:12px}
+    .admin-table td.ops{white-space:normal}
+    .admin-table td.ops .btn{margin-left:0;margin-top:4px;padding:5px 8px}
+    .acct-form .input{min-width:140px}
+    .theme-opt{padding:9px 12px;font-size:12px}
+  }
+</style>
+</head>
+<body>
+
+<!-- 管理密码 -->
+<div class="admin-gate" id="gate">
+  <div class="gate-card">
+    <div class="gate-em">🛡️</div>
+    <h1>管理后台</h1>
+    <p>请输入管理密码</p>
+    <input class="input" id="gatePwd" type="password" placeholder="管理密码" autocomplete="current-password">
+    <div class="gate-err" id="gateErr"></div>
+    <button class="btn btn-primary" id="gateBtn">进入管理</button>
+    <a class="gate-back" href="../index.html">返回站点</a>
+  </div>
+</div>
+
+<div class="admin-shell" id="shell" hidden>
+  <aside class="side">
+    <div class="side-brand">
+      <div class="side-mark">🛡️</div>
+      <div>
+        <div class="side-name">管理后台</div>
+        <div class="side-sub">智学云 · 全站控制</div>
+      </div>
+    </div>
+    <nav id="nav">
+      <button class="nav-item active" data-view="overview"><span class="em">📊</span><span>概览</span></button>
+      <button class="nav-item" data-view="accounts"><span class="em">🔑</span><span>账号与密码</span></button>
+      <button class="nav-item" data-view="students"><span class="em">🎓</span><span>学生与家长</span></button>
+      <button class="nav-item" data-view="data"><span class="em">🗂️</span><span>数据管理</span></button>
+      <button class="nav-item" data-view="sync"><span class="em">☁️</span><span>同步服务</span></button>
+      <button class="nav-item" data-view="client"><span class="em">🧩</span><span>客户端</span></button>
+    </nav>
+    <div class="side-foot">管理权限覆盖老师端、家长端、学生端以及云端同步数据。</div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">控制面板</h1>
+        <div class="sub" id="pageSub">管理用户、密码、学生档案与同步服务</div>
+      </div>
+      <div class="top-actions">
+        <span class="sync-chip" id="syncChip">● 未配置同步</span>
+        <button class="btn btn-ghost btn-sm" id="refreshBtn">刷新数据</button>
+        <button class="btn btn-ghost btn-sm" id="logoutBtn">退出</button>
+      </div>
+    </div>
+
+    <section class="admin-view active" id="view-overview">
+      <div class="grid stats" id="statGrid"></div>
+      <div class="card card-pad">
+        <div class="card-title"><span class="dot"></span>运行状态</div>
+        <div class="muted" id="overviewInfo"></div>
+      </div>
+    </section>
+
+    <section class="admin-view" id="view-accounts">
+      <div class="card card-pad" style="margin-bottom:16px">
+        <div class="card-title"><span class="dot"></span>老师端账号</div>
+        <div class="muted" style="margin-bottom:6px">一对一控制老师端登录密码，修改后立即同步到所有客户端。</div>
+        <div class="acct">
+          <div style="min-width:160px">
+            <div class="acct-name">👨‍🏫 老师</div>
+            <div class="acct-sub" id="state_teacher"></div>
+          </div>
+          <div class="acct-form">
+            <input class="input" id="pwd_teacher" type="password" placeholder="设置新密码（至少 4 位）" autocomplete="new-password">
+            <button class="btn btn-primary btn-sm" data-pwd-set="teacher">保存</button>
+            <button class="btn btn-ghost btn-sm" data-pwd-reset="teacher">重置</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-pad" style="margin-bottom:16px">
+        <div class="card-title"><span class="dot" style="background:var(--success)"></span>家长端账号</div>
+        <div class="muted" style="margin-bottom:6px">一对一控制家长端登录密码；每位家长与学生的绑定关系在「学生与家长」中管理。</div>
+        <div class="acct">
+          <div style="min-width:160px">
+            <div class="acct-name">👨‍👩‍👧 家长</div>
+            <div class="acct-sub" id="state_parent"></div>
+          </div>
+          <div class="acct-form">
+            <input class="input" id="pwd_parent" type="password" placeholder="设置新密码（至少 4 位）" autocomplete="new-password">
+            <button class="btn btn-primary btn-sm" data-pwd-set="parent">保存</button>
+            <button class="btn btn-ghost btn-sm" data-pwd-reset="parent">重置</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-pad" style="margin-bottom:16px">
+        <div class="card-title"><span class="dot" style="background:var(--info)"></span>管理员账号</div>
+        <div class="muted" style="margin-bottom:6px">管理后台自身的管理密码。</div>
+        <div class="acct">
+          <div style="min-width:160px">
+            <div class="acct-name">🛡️ 管理员</div>
+            <div class="acct-sub" id="state_admin"></div>
+          </div>
+          <div class="acct-form">
+            <input class="input" id="pwd_admin" type="password" placeholder="设置新密码（至少 4 位）" autocomplete="new-password">
+            <button class="btn btn-primary btn-sm" data-pwd-set="admin">保存</button>
+            <button class="btn btn-ghost btn-sm" data-pwd-reset="admin">重置</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-pad">
+        <div class="card-title"><span class="dot" style="background:var(--warn)"></span>统一密码</div>
+        <div class="muted" style="margin-bottom:12px">未单独设置密码的账号都会使用这个统一密码。密码仅以哈希形式保存，不会在任何页面显示。</div>
+        <div class="acct-form">
+          <input class="input" id="initPwd" type="password" placeholder="设置统一密码（至少 4 位）" autocomplete="new-password">
+          <button class="btn btn-primary btn-sm" id="initPwdBtn">保存统一密码</button>
+          <button class="btn btn-ghost btn-sm" id="resetAllPwdBtn">全部账号使用统一密码</button>
+        </div>
+        <div class="muted" id="initPwdState" style="margin-top:10px"></div>
+      </div>
+    </section>
+
+    <section class="admin-view" id="view-students">
+      <div class="card card-pad">
+        <div class="flex" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+          <div class="card-title" style="margin:0"><span class="dot"></span>学生与家长（一对一）</div>
+          <button class="btn btn-primary btn-sm" id="addStudentBtn" style="margin-left:auto">+ 添加学生</button>
+        </div>
+        <div class="muted" style="margin-bottom:12px">可以修改学生姓名、绑定或移除家长、删除学生。删除后成绩与老师建议会一并清除，并同步到所有客户端。</div>
+        <div class="tbl-wrap" id="studentTable"></div>
+      </div>
+    </section>
+
+    <section class="admin-view" id="view-data">
+      <div class="grid stats" id="dataStatGrid"></div>
+      <div class="card card-pad" style="margin-bottom:16px">
+        <div class="card-title"><span class="dot" style="background:var(--danger)"></span>数据清理</div>
+        <div class="muted" style="margin-bottom:12px">清理会立即生效并同步到所有客户端，删除后不可恢复。</div>
+        <div class="row-actions">
+          <button class="btn btn-ghost btn-sm" data-clear="homework">清空作业</button>
+          <button class="btn btn-ghost btn-sm" data-clear="notices">清空通知</button>
+          <button class="btn btn-ghost btn-sm" data-clear="scores">清空成绩记录</button>
+          <button class="btn btn-ghost btn-sm" data-clear="students">清空全部学生</button>
+          <button class="btn btn-danger btn-sm" data-clear="all">清空全部数据</button>
+        </div>
+        <div class="danger-line">
+          <div class="row-actions">
+            <button class="btn btn-ghost btn-sm" id="exportBtn">⬇ 导出备份</button>
+            <button class="btn btn-ghost btn-sm" id="importBtn">⬆ 导入备份</button>
+            <input type="file" id="importFile" accept="application/json,.json" hidden>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="admin-view" id="view-sync">
+      <div class="card card-pad">
+        <div class="card-title"><span class="dot" style="background:var(--success)"></span>云端同步（服务端）</div>
+        <div class="muted" style="margin-bottom:12px">
+          数据保存在 GitHub 仓库的一个 JSON 文件中。填写具备 repo 权限的访问令牌后，管理后台可以写入云端并控制所有客户端。
+          令牌只保存在当前浏览器，不会上传。
+        </div>
+        <div class="split">
+          <div class="field"><label class="lbl">仓库所有者 owner</label><input class="input" id="s_owner" autocomplete="off"></div>
+          <div class="field"><label class="lbl">仓库名 repo</label><input class="input" id="s_repo" autocomplete="off"></div>
+          <div class="field"><label class="lbl">分支 branch</label><input class="input" id="s_branch" autocomplete="off"></div>
+          <div class="field"><label class="lbl">数据文件路径</label><input class="input" id="s_path" autocomplete="off"></div>
+        </div>
+        <div class="field">
+          <label class="lbl">访问令牌 Token</label>
+          <input class="input" id="s_token" type="password" placeholder="ghp_... / github_pat_..." autocomplete="off">
+        </div>
+        <div class="row-actions">
+          <button class="btn btn-primary btn-sm" id="saveSyncBtn">保存并连接</button>
+          <button class="btn btn-ghost btn-sm" id="testSyncBtn">测试连接</button>
+          <button class="btn btn-ghost btn-sm" id="pullNowBtn">立即拉取</button>
+          <button class="btn btn-ghost btn-sm" id="pushNowBtn">立即推送</button>
+        </div>
+        <div class="sync-status" id="syncDetail">尚未连接云端。</div>
+      </div>
+    </section>
+
+    <section class="admin-view" id="view-client">
+      <div class="card card-pad" style="margin-bottom:16px">
+        <div class="card-title"><span class="dot" style="background:var(--accent)"></span>客户端外观</div>
+        <div class="muted" style="margin-bottom:6px">选择后会把主题设置同步到所有客户端。</div>
+        <div class="theme-opts">
+          <label class="theme-opt"><input type="radio" name="theme" value="light">☀️ 浅色</label>
+          <label class="theme-opt"><input type="radio" name="theme" value="dark">🌙 深色</label>
+        </div>
+        <div class="muted" id="themeState"></div>
+      </div>
+
+      <div class="card card-pad">
+        <div class="card-title"><span class="dot" style="background:var(--info)"></span>客户端提醒</div>
+        <div class="switch-line">
+          <div>
+            <div class="name">顶部消息提醒</div>
+            <div class="desc">有新的作业、通知、成绩或老师评价时，在客户端屏幕上方弹出提示。</div>
+          </div>
+          <input type="checkbox" id="notifyToggle">
+        </div>
+        <div class="muted" id="notifyState" style="margin-top:10px"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- 弹窗 -->
+<div class="modal-mask" id="modalMask">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modalTitle">标题</h3><button class="close-btn" id="modalClose">×</button></div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot" id="modalFoot"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= 基础配置 ================= */
+const DB_KEY='studyhub_v1';
+const GH_CFG_KEY='zhixueyun_ghcfg';
+const GH_TOKEN_KEY='zhixueyun_ghtoken';
+const ADMIN_UNLOCK='zhixueyun_admin_unlock';
+const DEFAULT_CFG={owner:'wanwanxuanxuan',repo:'feibiao',branch:'main',path:'data.json'};
+const DEF_PWD='123456';
+const ADMIN_VERSION='1';
+const DEVICE_ID='admin_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const DEFAULT_STORE={
+  tasks:[], schedule:[], grades:[], notes:[], countdowns:[], pomoLog:[], theme:'light',
+  homework:[], notices:[], students:[], records:{}, teacherPwd:null, parentPwd:null,
+  pwdPolicy:{}, removedStudents:{}, notifyEnabled:true, _meta:null
+};
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function readJSON(key,fallback){
+  try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch(e){return fallback}
+}
+function toast(msg){
+  const t=$('toast');if(!t)return;
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+/* ================= 数据层 ================= */
+function normalize(s){
+  s=s||{};
+  ['tasks','schedule','grades','notes','countdowns','pomoLog','homework','notices','students'].forEach(k=>{
+    if(!Array.isArray(s[k])) s[k]=[];
+  });
+  if(!s.records||typeof s.records!=='object')s.records={};
+  if(!s.pwdPolicy||typeof s.pwdPolicy!=='object')s.pwdPolicy={};
+  if(!s.removedStudents||typeof s.removedStudents!=='object')s.removedStudents={};
+  if(s.notifyEnabled===undefined)s.notifyEnabled=true;
+  if(!s.theme)s.theme='light';
+  return Object.assign({},DEFAULT_STORE,s);
+}
+let store=normalize(readJSON(DB_KEY,{}));
+function writeLocal(){localStorage.setItem(DB_KEY,JSON.stringify(store))}
+let pushTimer=null;
+function save(){
+  store._meta={updatedAt:Date.now(),device:DEVICE_ID};
+  writeLocal();
+  clearTimeout(pushTimer);
+  pushTimer=setTimeout(()=>{if(sync.ready())sync.push(false)},1500);
+}
+
+/* ================= 密码 ================= */
+async function hashPwd(p){
+  const s='zhixueyun::'+p;
+  try{
+    if(window.crypto&&crypto.subtle){
+      const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));
+      return 'sha256:'+Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+  }catch(e){}
+  let h=5381;
+  for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))>>>0;
+  return 'djb2:'+h.toString(16);
+}
+function effPwd(role){
+  const local=store[role+'Pwd'], pol=(store.pwdPolicy||{})[role];
+  if(local&&pol)return (+pol.at||0)>(+local.at||0)?pol:local;
+  return local||pol||null;
+}
+function policyInit(){return (store.pwdPolicy||{}).init||null}
+function roleState(role){
+  if(role==='admin'){
+    const p=(store.pwdPolicy||{}).admin;
+    if(!p)return {text:'跟随老师端密码',cls:'state-mute'};
+    if(p.hash==='default')return {text:'未单独设置',cls:'state-mute'};
+    return {text:'已自定义',cls:'state-ok'};
+  }
+  const p=effPwd(role);
+  if(!p||!p.hash)return {text:'未设置',cls:'state-mute'};
+  if(p.hash==='default')return {text:'未单独设置',cls:'state-mute'};
+  return {text:'已自定义',cls:'state-ok'};
+}
+async function checkHash(hash,p){
+  if(!hash)return false;
+  if(hash==='default'){
+    const ini=policyInit();
+    if(ini&&ini.hash)return (await hashPwd(p))===ini.hash;
+    return p===DEF_PWD;
+  }
+  return (await hashPwd(p))===hash;
+}
+async function adminVerify(p){
+  const pol=store.pwdPolicy||{};
+  if(pol.admin&&pol.admin.hash)return checkHash(pol.admin.hash,p);
+  if(pol.teacher&&pol.teacher.hash&&await checkHash(pol.teacher.hash,p))return true;
+  return checkHash('default',p);   // 未单独设置管理密码时，统一密码也可进入
+}
+async function setRolePwd(role){
+  const input=$('pwd_'+role);
+  const v=(input&&input.value)||'';
+  if(v.length<4){toast('密码至少 4 位');return}
+  const at=Date.now();
+  const h=await hashPwd(v);
+  store.pwdPolicy=store.pwdPolicy||{};
+  store.pwdPolicy[role]={hash:h,at};
+  if(role!=='admin')store[role+'Pwd']={hash:h,at};
+  save();
+  if(input)input.value='';
+  render();
+  toast(role==='admin'?'管理密码已更新':(role==='teacher'?'老师端密码已更新':'家长端密码已更新'));
+}
+function resetRolePwd(role){
+  if(!confirm('确定重置该账号密码？'))return;
+  const at=Date.now();
+  store.pwdPolicy=store.pwdPolicy||{};
+  store.pwdPolicy[role]={hash:'default',at};
+  if(role!=='admin')store[role+'Pwd']={hash:'default',at};
+  save();render();toast('已重置为统一密码');
+}
+async function setInitPwd(){
+  const el=$('initPwd');
+  const v=(el&&el.value)||'';
+  if(v.length<4){toast('统一密码至少 4 位');return}
+  store.pwdPolicy=store.pwdPolicy||{};
+  store.pwdPolicy.init={hash:await hashPwd(v),at:Date.now()};
+  save();
+  if(el)el.value='';
+  if(confirm('是否同时让所有账号都使用这个统一密码？')){
+    resetAllPwd(true);
+  }else{
+    render();toast('统一密码已更新');
+  }
+}
+function resetAllPwd(silent){
+  if(!silent&&!confirm('确定让老师端、家长端和管理员账号全部使用统一密码？'))return;
+  const at=Date.now();
+  store.pwdPolicy=store.pwdPolicy||{};
+  ['teacher','parent','admin'].forEach(r=>{
+    store.pwdPolicy[r]={hash:'default',at};
+    if(r!=='admin')store[r+'Pwd']={hash:'default',at};
+  });
+  save();render();toast('全部账号已使用统一密码');
+}
+
+/* ================= 学生与家长 ================= */
+function studentNames(){
+  return Array.from(new Set([...(store.students||[]),...Object.keys(store.records||{})]));
+}
+function ensureRec(name){
+  store.records=store.records||{};
+  if(!store.records[name])store.records[name]={parent:'',advice:'',scores:[]};
+  const r=store.records[name];
+  if(!Array.isArray(r.scores))r.scores=[];
+  if(typeof r.parent!=='string')r.parent='';
+  if(typeof r.advice!=='string')r.advice='';
+  return r;
+}
+function readName(key){return readJSON(key,'')||''}
+function writeName(key,v){if(v)localStorage.setItem(key,JSON.stringify(v));else localStorage.removeItem(key)}
+function renameLocalIdentity(oldName,newName){
+  if(readName('zhixueyun_student_name')===oldName)writeName('zhixueyun_student_name',newName);
+  if(readName('zhixueyun_parent_name')===oldName)writeName('zhixueyun_parent_name',newName);
+}
+function clearLocalIdentity(name){
+  if(readName('zhixueyun_student_name')===name)writeName('zhixueyun_student_name','');
+  if(readName('zhixueyun_parent_name')===name)writeName('zhixueyun_parent_name','');
+}
+function markRemoved(name){
+  store.removedStudents=store.removedStudents||{};
+  store.removedStudents[name]=Date.now();
+}
+function addStudent(){
+  const name=(prompt('请输入学生姓名')||'').trim();
+  if(!name)return;
+  if(studentNames().includes(name)){toast('已存在同名学生');return}
+  store.students=(store.students||[]).concat(name);
+  if(store.removedStudents)delete store.removedStudents[name];
+  ensureRec(name);
+  save();render();toast('已添加学生：'+name);
+}
+let EDIT_NAME='';
+function openStudentIdx(i){
+  const list=studentNames();
+  const name=list[i];
+  if(!name){toast('名单已更新，请重试');return}
+  EDIT_NAME=name;
+  const r=ensureRec(name);
+  openModal('学生 · '+name,`
+    <div class="field"><label class="lbl">学生姓名</label><input class="input" id="m_name" maxlength="12" value="${esc(name)}"></div>
+    <div class="field"><label class="lbl">家长姓名（一对一绑定，留空表示未绑定）</label><input class="input" id="m_parent" maxlength="20" value="${esc(r.parent)}" placeholder="例如：张小明爸爸"></div>
+    <div class="field"><label class="lbl">老师建议</label><textarea class="input" id="m_advice" rows="3" style="min-height:80px">${esc(r.advice)}</textarea></div>
+    <div class="muted">成绩记录 ${r.scores.length} 条 · 删除学生将一并清除成绩与老师建议。</div>`,
+    `<button class="btn btn-ghost" onclick="closeModal()">取消</button>
+     <button class="btn btn-ghost" style="color:var(--danger)" onclick="adminDelStudent()">删除学生</button>
+     <button class="btn btn-primary" onclick="saveStudent()">保存</button>`);
+}
+function saveStudent(){
+  const oldName=EDIT_NAME;
+  const newName=($('m_name').value||'').trim();
+  if(!newName){toast('请填写学生姓名');return}
+  const parent=($('m_parent').value||'').trim();
+  const advice=($('m_advice').value||'').trim();
+  const list=studentNames();
+  if(newName!==oldName&&list.includes(newName)){toast('已存在同名学生');return}
+  if(newName!==oldName){
+    store.students=(store.students||[]).map(n=>n===oldName?newName:n);
+    if(store.records&&store.records[oldName]){store.records[newName]=store.records[oldName];delete store.records[oldName]}
+    if(store.removedStudents)delete store.removedStudents[oldName];
+    renameLocalIdentity(oldName,newName);
+  }
+  if((store.students||[]).indexOf(newName)<0)store.students.push(newName);
+  const r=ensureRec(newName);
+  r.parent=parent;r.advice=advice;
+  save();closeModal();render();toast('已保存');
+}
+function adminDelStudent(){
+  const name=EDIT_NAME;
+  if(!name)return;
+  if(!confirm(`确定删除学生「${name}」？TA 的成绩记录与老师建议会一并删除。`))return;
+  store.students=(store.students||[]).filter(n=>n!==name);
+  if(store.records)delete store.records[name];
+  markRemoved(name);
+  clearLocalIdentity(name);
+  save();closeModal();render();toast('已删除：'+name);
+}
+function unbindParent(i){
+  const name=studentNames()[i];
+  if(!name)return;
+  if(!confirm(`确定移除「${name}」的家长绑定？`))return;
+  ensureRec(name).parent='';
+  if(readName('zhixueyun_parent_name')===name)writeName('zhixueyun_parent_name','');
+  save();render();toast('已移除家长绑定');
+}
+/* ================= 数据清理 ================= */
+function clearData(kind){
+  if(kind==='homework'){
+    if(!confirm('确定清空全部作业？'))return;
+    store.homework=[];save();render();toast('已清空作业');
+  }else if(kind==='notices'){
+    if(!confirm('确定清空全部通知？'))return;
+    store.notices=[];save();render();toast('已清空通知');
+  }else if(kind==='scores'){
+    if(!confirm('确定清空全部成绩记录？老师建议会保留。'))return;
+    Object.keys(store.records||{}).forEach(n=>{ensureRec(n).scores=[]});
+    save();render();toast('已清空成绩记录');
+  }else if(kind==='students'){
+    if(!confirm('确定清空全部学生与家长绑定？成绩记录会一并删除。'))return;
+    const names=studentNames();
+    names.forEach(markRemoved);
+    store.students=[];store.records={};
+    names.forEach(clearLocalIdentity);
+    save();render();toast('已清空全部学生');
+  }else if(kind==='all'){
+    if(!confirm('确定清空全部数据？作业 / 通知 / 成绩 / 学生 / 任务等都会被删除（密码设置保留），且不可恢复。'))return;
+    const names=studentNames();
+    const pol=store.pwdPolicy, theme=store.theme, notify=store.notifyEnabled;
+    store=normalize(Object.assign({},DEFAULT_STORE));
+    store.pwdPolicy=pol||{};store.theme=theme||'light';store.notifyEnabled=notify!==false;
+    names.forEach(markRemoved);
+    names.forEach(clearLocalIdentity);
+    save();render();toast('已清空全部数据');
+  }
+}
+function exportData(){
+  const clean=JSON.parse(JSON.stringify(store));
+  delete clean.teacherPwd;delete clean.parentPwd;delete clean.pwdPolicy;delete clean._meta;
+  const d=new Date();
+  const stamp=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const blob=new Blob([JSON.stringify(clean,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=`zhixueyun-admin-${stamp}.json`;a.click();
+  toast('备份已导出');
+}
+function importData(input){
+  const f=input.files&&input.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const data=JSON.parse(r.result);
+      const pol=store.pwdPolicy, theme=store.theme;
+      store=normalize(Object.assign({},DEFAULT_STORE,data));
+      store.pwdPolicy=pol||{};
+      if(theme)store.theme=theme;
+      save();render();toast('备份已导入');
+    }catch(e){toast('导入失败：文件格式错误')}
+    input.value='';
+  };
+  r.readAsText(f);
+}
+
+/* ================= 云端同步 ================= */
+const sync={
+  cfg:Object.assign({},DEFAULT_CFG,readJSON(GH_CFG_KEY,{})||{}),
+  sha:null,pulling:false,pushing:false,timer:null,state:'',lastError:'',lastPull:0,
+  token(){return readJSON(GH_TOKEN_KEY,'')||''},
+  setToken(t){localStorage.setItem(GH_TOKEN_KEY,JSON.stringify(t||''))},
+  ready(){return !!(this.cfg.owner&&this.cfg.repo&&this.token())},
+  apiUrl(){
+    const {owner,repo,path,branch}=this.cfg;
+    return `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(branch||'main')}`;
+  },
+  headers(){
+    const h={'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+    if(this.token())h['Authorization']='Bearer '+this.token();
+    return h;
+  },
+  start(){
+    if(!this.cfg.owner||!this.cfg.repo)return;
+    this.pull(true);
+    clearInterval(this.timer);
+    this.timer=setInterval(()=>{
+      if(document.visibilityState!=='visible')return;
+      this.pull(true);
+    },15000);
+  },
+  applyRemote(payload){
+    store=normalize(Object.assign({},DEFAULT_STORE,payload.data||{}));
+    store._meta={updatedAt:+payload.updatedAt||Date.now(),device:payload.device||'remote'};
+    writeLocal();
+    render();
+  },
+  async pull(silent){
+    if(!this.cfg.owner||!this.cfg.repo||this.pulling)return;
+    this.pulling=true;
+    try{
+      const res=await fetch(this.apiUrl()+'&_='+Date.now(),{headers:this.headers(),cache:'no-store'});
+      if(res.status===404){this.state='online';this.lastError='';return}
+      if(res.status===401)throw new Error('令牌无效（401）');
+      if(res.status===403||res.status===429){
+        if(!this.token()){this.pulling=false;await this.pullRaw(silent);return}
+        throw new Error('令牌无效或权限不足（'+res.status+'）');
+      }
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      const info=await res.json();
+      this.sha=info.sha;
+      const payload=JSON.parse(decodeB64(info.content));
+      this.lastPull=Date.now();
+      const remoteAt=+(payload&&payload.updatedAt||0);
+      const localAt=+((store._meta&&store._meta.updatedAt)||0);
+      if(payload&&payload.data&&remoteAt>localAt){
+        this.applyRemote(payload);
+        if(!silent)toast('已获取云端最新数据');
+      }else if(payload&&payload.data&&localAt>remoteAt&&this.token()){
+        this.pulling=false;
+        await this.push(false);
+        return;
+      }
+      this.state='online';this.lastError='';
+    }catch(e){
+      this.state='offline';this.lastError=(e&&e.message)?e.message:String(e);
+    }finally{
+      this.pulling=false;
+      renderSyncStatus();
+    }
+  },
+  async pullRaw(silent){
+    try{
+      const {owner,repo,path,branch}=this.cfg;
+      const url=`https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(branch||'main')}/${path}?_=${Date.now()}`;
+      const res=await fetch(url,{cache:'no-store'});
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      const payload=await res.json();
+      this.lastPull=Date.now();
+      const remoteAt=+(payload&&payload.updatedAt||0);
+      const localAt=+((store._meta&&store._meta.updatedAt)||0);
+      if(payload&&payload.data&&remoteAt>localAt){
+        this.applyRemote(payload);
+        if(!silent)toast('已获取云端最新数据');
+      }
+      this.state='online';this.lastError='';
+    }catch(e){
+      this.state='offline';this.lastError=(e&&e.message)?e.message:String(e);
+    }finally{
+      renderSyncStatus();
+    }
+  },
+  async push(manual){
+    if(!this.ready()||this.pushing)return false;
+    this.pushing=true;
+    try{
+      if(!store._meta||!store._meta.updatedAt)store._meta={updatedAt:Date.now(),device:DEVICE_ID};
+      const data=Object.assign({},store);
+      delete data.teacherPwd;delete data.parentPwd;
+      const payload={v:1,updatedAt:store._meta.updatedAt,device:store._meta.device||DEVICE_ID,data};
+      const body={
+        message:`管理后台同步 · ${new Date().toLocaleString('zh-CN')}`,
+        content:encodeB64(JSON.stringify(payload)),
+        branch:this.cfg.branch||'main'
+      };
+      if(this.sha)body.sha=this.sha;
+      const res=await fetch(`https://api.github.com/repos/${this.cfg.owner}/${this.cfg.repo}/contents/${this.cfg.path}`,{
+        method:'PUT',
+        headers:Object.assign({'Content-Type':'application/json'},this.headers()),
+        body:JSON.stringify(body)
+      });
+      if(res.status===409||res.status===422){
+        this.sha=null;this.pushing=false;
+        await this.pull(true);
+        return await this.push(manual);
+      }
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      const j=await res.json();
+      this.sha=j.content&&j.content.sha;
+      this.state='online';this.lastError='';
+      if(manual)toast('已推送到云端');
+      return true;
+    }catch(e){
+      this.state='offline';this.lastError=(e&&e.message)?e.message:String(e);
+      if(manual)toast('推送失败：'+this.lastError);
+      return false;
+    }finally{
+      this.pushing=false;
+      renderSyncStatus();
+    }
+  }
+};
+function encodeB64(str){return btoa(unescape(encodeURIComponent(str)))}
+function decodeB64(b64){
+  const bin=atob(String(b64||'').replace(/\s/g,''));
+  const bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+/* ================= 渲染 ================= */
+function renderOverview(){
+  const names=studentNames();
+  const bound=names.filter(n=>(store.records[n]||{}).parent).length;
+  const scoreCount=names.reduce((s,n)=>s+(((store.records[n]||{}).scores)||[]).length,0);
+  const items=[
+    ['学生总数',names.length,'var(--primary)'],
+    ['已绑定家长',bound,'var(--success)'],
+    ['作业',(store.homework||[]).length,'var(--info)'],
+    ['通知',(store.notices||[]).length,'var(--warn)'],
+    ['成绩记录',scoreCount,'var(--accent)']
+  ];
+  $('statGrid').innerHTML=items.map(([label,value,color])=>`
+    <div class="stat-card"><div class="glow" style="background:${color}"></div>
+      <div class="label">${label}</div><div class="value">${value}</div>
+    </div>`).join('');
+  const meta=store._meta||{};
+  const at=meta.updatedAt?new Date(meta.updatedAt).toLocaleString('zh-CN'):'—';
+  $('overviewInfo').innerHTML=`
+    最近更新：${esc(at)}<br>
+    数据设备：${esc(meta.device||'—')}<br>
+    页面版本：管理后台 v${ADMIN_VERSION}<br>
+    全站学生 ${names.length} 人，其中 ${bound} 人已绑定家长，${names.length-bound} 人未绑定家长。`;
+}
+function renderAccounts(){
+  ['teacher','parent','admin'].forEach(r=>{
+    const el=$('state_'+r);
+    if(!el)return;
+    const st=roleState(r);
+    el.innerHTML=`当前：<span class="${st.cls}">${st.text}</span>`;
+  });
+  const ini=policyInit();
+  $('initPwdState').innerHTML=ini&&ini.hash
+    ? '统一密码：<span class="state-ok">已设置</span>'
+    : '统一密码：<span class="state-mute">未单独设置</span>';
+}
+function renderStudents(){
+  const names=studentNames();
+  const root=$('studentTable');
+  if(!root)return;
+  if(!names.length){
+    root.innerHTML='<div class="empty-tip">还没有学生。学生首次进入学生端会自动登记，也可以点右上角「+ 添加学生」。</div>';
+    return;
+  }
+  root.innerHTML=`<table class="admin-table">
+    <thead><tr><th>学生</th><th>家长</th><th>成绩</th><th style="text-align:right">操作</th></tr></thead>
+    <tbody>${names.map((n,i)=>{
+      const r=store.records[n]||{};
+      const cnt=((r.scores)||[]).length;
+      return `<tr>
+        <td style="font-weight:700">${esc(n)}</td>
+        <td>${r.parent?esc(r.parent):'<span class="state-warn">未绑定</span>'}</td>
+        <td>${cnt} 次${r.advice?' · 已写建议':''}</td>
+        <td class="ops">
+          <button class="btn btn-ghost btn-sm" data-student-act="edit" data-i="${i}">设置</button>
+          ${r.parent?`<button class="btn btn-ghost btn-sm" data-student-act="unbind" data-i="${i}">移除家长</button>`:''}
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger)" data-student-act="del" data-i="${i}">删除</button>
+        </td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+}
+function renderData(){
+  const names=studentNames();
+  const scoreCount=names.reduce((s,n)=>s+(((store.records[n]||{}).scores)||[]).length,0);
+  const items=[
+    ['作业',(store.homework||[]).length],
+    ['通知',(store.notices||[]).length],
+    ['学生',names.length],
+    ['成绩记录',scoreCount]
+  ];
+  $('dataStatGrid').innerHTML=items.map(([label,value])=>`
+    <div class="stat-card"><div class="label">${label}</div><div class="value">${value}</div></div>`).join('');
+}
+function renderSyncStatus(){
+  const chip=$('syncChip');
+  const configured=!!(sync.cfg.owner&&sync.cfg.repo);
+  const state=sync.state;
+  let text='未配置同步',cls='';
+  if(configured){
+    if(state==='offline'){text='同步异常';cls='err'}
+    else if(sync.ready()){text='已连接 · 可写';cls='on'}
+    else {text='只读同步 · 未填令牌';cls=''}
+  }
+  if(chip){chip.textContent='● '+text;chip.className='sync-chip '+cls}
+  const detail=$('syncDetail');
+  if(detail){
+    const last=sync.lastPull?new Date(sync.lastPull).toLocaleString('zh-CN'):'—';
+    detail.innerHTML=`
+      当前状态：${state==='offline'?'<span class="state-warn">同步异常</span>':(configured?'<span class="state-ok">正常</span>':'<span class="state-mute">未连接</span>')}<br>
+      可写权限：${sync.ready()?'<span class="state-ok">已启用</span>':'<span class="state-mute">未填写令牌时只能读取</span>'}<br>
+      最近拉取：${esc(last)}<br>
+      ${sync.lastError?'错误：<span class="state-warn">'+esc(sync.lastError)+'</span>':''
+    }`;
+  }
+}
+function renderClient(){
+  const radios=document.querySelectorAll('input[name="theme"]');
+  radios.forEach(r=>{r.checked=(store.theme||'light')===r.value});
+  $('themeState').textContent='当前客户端主题：'+(store.theme==='dark'?'深色':'浅色');
+  $('notifyToggle').checked=store.notifyEnabled!==false;
+  $('notifyState').textContent='当前状态：'+(store.notifyEnabled!==false?'已开启':'已关闭');
+}
+function render(){
+  renderOverview();
+  renderAccounts();
+  renderStudents();
+  renderData();
+  renderSyncStatus();
+  renderClient();
+}
+
+/* ================= 弹窗 ================= */
+function openModal(title,body,foot){
+  $('modalTitle').textContent=title;
+  $('modalBody').innerHTML=body;
+  $('modalFoot').innerHTML=foot;
+  $('modalMask').classList.add('show');
+}
+function closeModal(){$('modalMask').classList.remove('show')}
+
+/* ================= 交互绑定 ================= */
+const VIEW_META={
+  overview:['控制面板','管理用户、密码、学生档案与同步服务'],
+  accounts:['账号与密码','一对一控制老师、家长与管理员密码'],
+  students:['学生与家长','一对一绑定家长，删除或修改学生'],
+  data:['数据管理','清理与备份全站数据'],
+  sync:['同步服务','云端数据读写与连接设置'],
+  client:['客户端','外观主题与消息提醒控制']
+};
+function setPage(view){
+  const meta=VIEW_META[view]||VIEW_META.overview;
+  if($('pageTitle'))$('pageTitle').textContent=meta[0];
+  if($('pageSub'))$('pageSub').textContent=meta[1];
+}
+document.querySelectorAll('#nav .nav-item').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('#nav .nav-item').forEach(b=>b.classList.toggle('active',b===btn));
+    document.querySelectorAll('.admin-view').forEach(v=>v.classList.remove('active'));
+    const v=$('view-'+btn.dataset.view);
+    if(v)v.classList.add('active');
+    setPage(btn.dataset.view);
+    window.scrollTo(0,0);
+  });
+});
+document.querySelectorAll('[data-pwd-set]').forEach(b=>b.addEventListener('click',()=>setRolePwd(b.dataset.pwdSet)));
+document.querySelectorAll('[data-pwd-reset]').forEach(b=>b.addEventListener('click',()=>resetRolePwd(b.dataset.pwdReset)));
+$('initPwdBtn').addEventListener('click',setInitPwd);
+$('resetAllPwdBtn').addEventListener('click',()=>resetAllPwd(false));
+$('addStudentBtn').addEventListener('click',addStudent);
+$('studentTable').addEventListener('click',e=>{
+  const b=e.target.closest('[data-student-act]');
+  if(!b)return;
+  const i=+b.dataset.i;
+  if(b.dataset.studentAct==='edit')openStudentIdx(i);
+  else if(b.dataset.studentAct==='unbind')unbindParent(i);
+  else if(b.dataset.studentAct==='del'){EDIT_NAME=studentNames()[i]||'';adminDelStudent()}
+});
+document.querySelectorAll('[data-clear]').forEach(b=>b.addEventListener('click',()=>clearData(b.dataset.clear)));
+$('exportBtn').addEventListener('click',exportData);
+$('importBtn').addEventListener('click',()=>$('importFile').click());
+$('importFile').addEventListener('change',e=>importData(e.target));
+$('modalClose').addEventListener('click',closeModal);
+$('modalMask').addEventListener('click',e=>{if(e.target.id==='modalMask')closeModal()});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&$('modalMask').classList.contains('show'))closeModal();
+  if(e.key==='Enter'&&document.activeElement===$('gatePwd'))tryEnter();
+});
+$('gateBtn').addEventListener('click',tryEnter);
+document.querySelectorAll('input[name="theme"]').forEach(r=>{
+  r.addEventListener('change',()=>{
+    if(!r.checked)return;
+    store.theme=r.value;save();render();toast('已同步为'+(r.value==='dark'?'深色':'浅色')+'主题');
+  });
+});
+$('notifyToggle').addEventListener('change',e=>{
+  store.notifyEnabled=!!e.target.checked;save();render();
+  toast(store.notifyEnabled?'已开启客户端提醒':'已关闭客户端提醒');
+});
+$('saveSyncBtn').addEventListener('click',()=>{
+  const cfg={
+    owner:($('s_owner').value||'').trim(),
+    repo:($('s_repo').value||'').trim(),
+    branch:($('s_branch').value||'').trim()||'main',
+    path:($('s_path').value||'').trim()||'data.json'
+  };
+  if(!cfg.owner||!cfg.repo){toast('请填写仓库所有者与仓库名');return}
+  sync.cfg=cfg;
+  localStorage.setItem(GH_CFG_KEY,JSON.stringify(cfg));
+  sync.setToken(($('s_token').value||'').trim());
+  sync.sha=null;sync.state='';
+  sync.pull(false);
+  toast('同步配置已保存');
+});
+$('testSyncBtn').addEventListener('click',async()=>{
+  const cfg={
+    owner:($('s_owner').value||'').trim(),
+    repo:($('s_repo').value||'').trim(),
+    branch:($('s_branch').value||'').trim()||'main',
+    path:($('s_path').value||'').trim()||'data.json'
+  };
+  const token=($('s_token').value||'').trim();
+  if(!cfg.owner||!cfg.repo){toast('请先填写 owner 与 repo');return}
+  const detail=$('syncDetail');
+  detail.textContent='正在测试连接...';
+  const oldCfg=sync.cfg,oldToken=sync.token();
+  sync.cfg=cfg;sync.setToken(token);
+  try{
+    const res=await fetch(sync.apiUrl()+'&_='+Date.now(),{headers:sync.headers(),cache:'no-store'});
+    if(res.status===404)detail.innerHTML='<span class="state-ok">✓ 连接成功：仓库可访问，数据文件尚未创建。</span>';
+    else if(res.status===401)detail.innerHTML='<span class="state-warn">✗ 令牌无效（401）</span>';
+    else if(res.status===403)detail.innerHTML='<span class="state-warn">✗ 权限不足或触发限流（403）</span>';
+    else if(!res.ok)detail.innerHTML='<span class="state-warn">✗ 连接失败：HTTP '+res.status+'</span>';
+    else{
+      const info=await res.json();
+      detail.innerHTML=`<span class="state-ok">✓ 连接成功：文件 ${info.size||0} 字节，提交 ${String(info.sha||'').slice(0,7)}</span>`;
+    }
+  }catch(e){
+    detail.innerHTML='<span class="state-warn">✗ 连接失败：'+esc(e.message||String(e))+'</span>';
+  }
+  sync.cfg=oldCfg;sync.setToken(oldToken);
+});
+$('pullNowBtn').addEventListener('click',async()=>{
+  await sync.pull(false);
+  renderSyncStatus();
+  toast('已拉取云端数据');
+});
+$('pushNowBtn').addEventListener('click',async()=>{
+  if(!sync.ready()){toast('请先填写访问令牌');return}
+  await sync.push(true);
+});
+$('refreshBtn').addEventListener('click',async()=>{
+  if(sync.cfg.owner&&sync.cfg.repo)await sync.pull(false);
+  render();
+  toast('已刷新');
+});
+$('logoutBtn').addEventListener('click',()=>{
+  sessionStorage.removeItem(ADMIN_UNLOCK);
+  location.reload();
+});
+
+/* ================= 入口 ================= */
+function showShell(){
+  $('gate').style.display='none';
+  $('shell').hidden=false;
+  $('s_owner').value=sync.cfg.owner||'';
+  $('s_repo').value=sync.cfg.repo||'';
+  $('s_branch').value=sync.cfg.branch||'main';
+  $('s_path').value=sync.cfg.path||'data.json';
+  $('s_token').value=sync.token();
+  setPage('overview');
+  render();
+  sync.start();
+}
+async function tryEnter(){
+  const pwd=$('gatePwd').value||'';
+  if(!pwd){$('gateErr').textContent='请输入管理密码';return}
+  if(await adminVerify(pwd)){
+    sessionStorage.setItem(ADMIN_UNLOCK,'1');
+    $('gateErr').textContent='';
+    showShell();
+  }else{
+    $('gateErr').textContent='密码不正确，请重试';
+    $('gatePwd').value='';
+    $('gatePwd').focus();
+  }
+}
+(function init(){
+  if(store.theme==='dark')document.documentElement.classList.add('dark');
+  if(sessionStorage.getItem(ADMIN_UNLOCK)==='1')showShell();
+  else setTimeout(()=>$('gatePwd').focus(),120);
+})();
+</script>
+</body>
+</html>
