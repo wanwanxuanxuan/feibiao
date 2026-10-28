@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>小谷 · 谷仓 AI 伙伴</title>
+<meta name="description" content="谷仓 AI 伙伴小谷：会聊天，也会在屏幕上表演 86 种表情、动作、特效、音效和小工具。" />
+<meta name="theme-color" content="#08070f" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238b6cff'/%3E%3Cstop offset='1' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='26' fill='url(%23g)'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='%23fff' font-family='sans-serif' font-weight='bold'%3E谷%3C/text%3E%3C/svg%3E" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.10.0/styles/atom-one-dark.min.css" />
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+
+<div class="app" id="app">
+  <!-- 侧栏 -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="orb orb-sm"><span>谷</span></div>
+      <div class="brand-text">
+        <div class="brand-name">小谷</div>
+        <div class="brand-sub">谷仓 AI 伙伴</div>
+      </div>
+      <button class="icon-btn ghost close-side" id="closeSidebar" type="button" aria-label="关闭侧栏">×</button>
+    </div>
+
+    <button class="new-chat" id="newChat" type="button">
+      <span class="plus">＋</span> 新对话
+    </button>
+
+    <nav class="nav">
+      <button class="nav-item" type="button" data-open="ixlib">
+        <span class="nav-ic">🎛</span>
+        <span>互动库</span>
+        <span class="nav-pill">86</span>
+      </button>
+      <button class="nav-item" type="button" data-open="settings">
+        <span class="nav-ic">⚙</span>
+        <span>设置</span>
+      </button>
+      <button class="nav-item" id="themeSideBtn" type="button">
+        <span class="nav-ic">◐</span>
+        <span>切换主题</span>
+      </button>
+    </nav>
+
+    <div class="recent">
+      <div class="sec-title">最近互动</div>
+      <div class="recent-list" id="recentIx"></div>
+    </div>
+
+    <div class="side-note">
+      小谷会在聊天里调用表情、动作、特效、音效和小工具，共 <b>86</b> 种。
+    </div>
+  </aside>
+
+  <div class="backdrop" id="backdrop"></div>
+
+  <!-- 主区 -->
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" id="openSidebar" type="button" aria-label="打开侧栏">☰</button>
+      <div class="head-id">
+        <div class="orb orb-xs"><span>谷</span><i class="status-dot"></i></div>
+        <div class="head-text">
+          <div class="head-name">小谷</div>
+          <div class="head-sub"><span class="live"></span>在线 · 86 种互动</div>
+        </div>
+      </div>
+
+      <button class="model-chip" id="modelChip" type="button" title="点击切换模型">Nemotron 3 Ultra · free</button>
+
+      <div class="top-actions">
+        <button class="icon-btn" id="themeBtn" type="button" title="切换主题">◐</button>
+        <button class="icon-btn" id="clearChat" type="button" title="清空当前对话">🗑</button>
+        <button class="icon-btn" id="settingsBtn" type="button" title="设置">⚙</button>
+      </div>
+    </header>
+
+    <main class="chat" id="chatScroll">
+      <div class="messages" id="messages"></div>
+
+      <section class="welcome" id="welcome">
+        <div class="orb orb-lg">
+          <span>谷</span>
+          <div class="orb-ring"></div>
+          <div class="orb-ring r2"></div>
+        </div>
+        <p class="welcome-kicker">谷仓 AI 伙伴</p>
+        <h1>我是小谷，<br class="br-m" />住在谷仓里的 AI 伙伴</h1>
+        <p class="welcome-sub">
+          我不只会聊天，还会在你的屏幕上表演 —— <b>86 种</b>表情、动作、特效、音效和小工具。
+          回复里的 Markdown、公式、思考标签和工具调用，我也会好好处理。
+        </p>
+
+        <div class="suggestions" id="suggestions">
+          <button class="suggest" type="button" data-send="给我放一场烟花，然后说一句你此刻想说的话">
+            <span>🎆</span> 放一场烟花，再说句话
+          </button>
+          <button class="suggest" type="button" data-send="用表格对比 Markdown 和 HTML 的优缺点，最后撒个花">
+            <span>📊</span> 用表格做一次对比
+          </button>
+          <button class="suggest" type="button" data-send="讲个冷笑话，最后给我一个抱抱">
+            <span>🤗</span> 讲冷笑话 + 抱抱
+          </button>
+          <button class="suggest" type="button" data-send="用 $$E=mc^2$$ 解释质能方程，再下一场雪">
+            <span>❄️</span> 公式 + 下雪
+          </button>
+          <button class="suggest" type="button" data-send="我今天有点累，陪我待一会儿">
+            <span>🫧</span> 我有点累，陪陪我
+          </button>
+          <button class="suggest" type="button" data-send="展示一下你的代码能力：写一个 Python 快排，再放个终场烟火">
+            <span>💻</span> 代码 + 终场烟火
+          </button>
+        </div>
+
+        <button class="link-btn" type="button" data-open="ixlib">
+          看看全部 <b>86</b> 种互动 →
+        </button>
+
+        <div class="welcome-tips">
+          <span>支持 Markdown / LaTeX / <code>&lt;thinking&gt;</code> / <code>&lt;tool_call&gt;</code></span>
+        </div>
+      </section>
+    </main>
+
+    <div class="composer-wrap">
+      <div class="quickbar">
+        <span class="quick-label">快捷表情</span>
+        <button class="quick-emoji" type="button" data-emoji="😄">😄</button>
+        <button class="quick-emoji" type="button" data-emoji="😂">😂</button>
+        <button class="quick-emoji" type="button" data-emoji="🥺">🥺</button>
+        <button class="quick-emoji" type="button" data-emoji="😮">😮</button>
+        <button class="quick-emoji" type="button" data-emoji="👍">👍</button>
+        <button class="quick-emoji" type="button" data-emoji="🎉">🎉</button>
+        <button class="quick-emoji" type="button" data-emoji="❤️">❤️</button>
+        <button class="quick-emoji" type="button" data-emoji="🤔">🤔</button>
+        <button class="ix-btn" type="button" id="openIx">🎛 互动库</button>
+      </div>
+
+      <form class="composer" id="composer">
+        <textarea id="input" rows="1" placeholder="和小谷说点什么…（Enter 发送，Shift + Enter 换行）" autocomplete="off"></textarea>
+        <div class="composer-foot">
+          <span class="hint">小谷会自己挑选合适的互动 · <kbd>Ctrl</kbd>+<kbd>K</kbd> 打开互动库</span>
+          <div class="send-wrap">
+            <button type="submit" class="send-btn" id="sendBtn" aria-label="发送">→</button>
+            <button type="button" class="send-btn stop hidden" id="stopBtn" aria-label="停止生成">■</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 特效层 -->
+<canvas id="fx-canvas" aria-hidden="true"></canvas>
+<div id="fx-layer" aria-hidden="true"></div>
+<div id="fx-banner" aria-hidden="true"></div>
+
+<!-- 互动库 -->
+<div class="modal" id="ixModal" hidden>
+  <div class="modal-card lib-card">
+    <div class="modal-head">
+      <div>
+        <h2>互动库</h2>
+        <p>86 种内置互动 · 点任意一个立刻在屏幕上触发，AI 也会自己调用</p>
+      </div>
+      <button class="modal-x" type="button" data-close aria-label="关闭">×</button>
+    </div>
+    <div class="lib-tools">
+      <input id="ixSearch" type="search" placeholder="搜索：抱抱 / 烟花 / 主题 / 转盘…" autocomplete="off" />
+      <span class="lib-tip">按类别筛选</span>
+    </div>
+    <div class="lib-cats" id="libCats"></div>
+    <div class="ix-grid" id="ixGrid"></div>
+  </div>
+</div>
+
+<!-- 设置 -->
+<div class="modal" id="settingsModal" hidden>
+  <div class="modal-card settings-card">
+    <div class="modal-head">
+      <div>
+        <h2>设置</h2>
+        <p>连接 OpenRouter，选择小谷的大脑</p>
+      </div>
+      <button class="modal-x" type="button" data-close aria-label="关闭">×</button>
+    </div>
+
+    <div class="settings-body">
+      <label class="field-label" for="setKey">API Key</label>
+      <div class="key-row">
+        <input id="setKey" type="password" spellcheck="false" placeholder="sk-or-v1-..." />
+        <button class="mini-btn" type="button" id="toggleKey">显示</button>
+      </div>
+      <p class="field-note">Key 只保存在当前浏览器。静态页面的默认 Key 对所有访问者可见，建议换成自己的 Key 并设置额度。</p>
+
+      <label class="field-label" for="setModel">模型</label>
+      <select id="setModel">
+        <option value="nvidia/nemotron-3-ultra-550b-a55b:free">Nemotron 3 Ultra 550B · 推荐 · 免费</option>
+        <option value="nvidia/nemotron-3.5-lightning:free">Nemotron 3.5 Lightning · 更快 · 免费</option>
+        <option value="nvidia/nemotron-3.5-super-vl:free">Nemotron 3.5 Super VL · 多模态 · 免费</option>
+        <option value="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free">Nemotron 3 Nano Omni · 轻量 · 免费</option>
+        <option value="nvidia/nemotron-3.5-rerank-8b:free" disabled>nemotron-3.5-rerank-8b · 重排序模型，不支持对话</option>
+      </select>
+      <p class="field-note warn">你指定的 <code>nvidia/nemotron-3.5-rerank-8b:free</code> 是重排序（rerank）模型，只能用于 <code>/rerank</code> 接口，不能聊天，所以默认切换成了 Nemotron 3 Ultra。</p>
+
+      <label class="switch"><input id="setSound" type="checkbox" checked /><span>互动音效</span></label>
+      <label class="switch"><input id="setThink" type="checkbox" checked /><span>显示思考过程（默认折叠）</span></label>
+
+      <div class="settings-actions">
+        <button class="btn ghost" type="button" id="resetSettings">恢复默认</button>
+        <button class="btn primary" type="button" id="saveSettings">保存设置</button>
+      </div>
+
+      <div class="settings-foot">
+        86 种互动 · Markdown / LaTeX / 思考标签 / tool_call 全支持
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.10.0/lib/common.min.js" defer></script>
+<script src="./markdown.js" defer></script>
+<script src="./interactions.js" defer></script>
+<script src="./app.js" defer></script>
+</body>
+</html>
