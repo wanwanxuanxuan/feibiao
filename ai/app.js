@@ -39,7 +39,8 @@
       model: DEFAULT_MODEL,
       sound: true,
       showThinking: true,
-      fx: true
+      fx: true,
+      maxTokens: 3000
     };
     try {
       var raw = localStorage.getItem(LS_SET);
@@ -51,6 +52,8 @@
           if (typeof j.sound === 'boolean') s.sound = j.sound;
           if (typeof j.showThinking === 'boolean') s.showThinking = j.showThinking;
           if (typeof j.fx === 'boolean') s.fx = j.fx;
+          var mt = parseInt(j.maxTokens, 10);
+          if (mt >= 500 && mt <= 32000) s.maxTokens = mt;
         }
       }
     } catch (e) {}
@@ -706,7 +709,7 @@
               messages: [{ role: 'system', content: buildSystemPrompt({ forceFx: forceFx, forceHtml: forceHtml }) }].concat(visibleHistory()),
               stream: true,
               temperature: 0.85,
-              max_tokens: forceHtml ? 12000 : (forceFx ? 8000 : 3000),
+              max_tokens: forceHtml ? Math.max(12000, settings.maxTokens * 4) : (forceFx ? Math.max(8000, settings.maxTokens * 3) : settings.maxTokens),
               top_p: 0.9
             })
           });
@@ -751,9 +754,10 @@
       if (parsed.reasoning) {
         streaming.reasoning = (streaming.reasoning ? streaming.reasoning + '\n\n' : '') + parsed.reasoning;
       }
-      var finalText = parsed.text || raw.trim();
+      var finalText = parsed.text;
       if (!finalText) {
-        finalText = '（模型只给出了思考，没有正文。要不要再问我一次？）';
+        finalText = (placeholder.fx && placeholder.fx.length) || (placeholder.htmlFx && placeholder.htmlFx.length)
+          ? '' : '（模型只给出了思考，没有正文。要不要再问我一次？）';
       }
 
       placeholder.text = finalText;
@@ -1069,6 +1073,7 @@
     $('#setSound').checked = !!settings.sound;
     $('#setThink').checked = !!settings.showThinking;
     if ($('#setFx')) $('#setFx').checked = !!settings.fx;
+    if ($('#setTokens')) $('#setTokens').value = settings.maxTokens;
     openModal('settingsModal');
   }
 
@@ -1169,6 +1174,10 @@
       settings.sound = $('#setSound').checked;
       settings.showThinking = $('#setThink').checked;
       if ($('#setFx')) settings.fx = $('#setFx').checked;
+      var mt = parseInt($('#setTokens').value, 10);
+      if (isNaN(mt) || mt < 500) mt = 3000;
+      if (mt > 32000) mt = 32000;
+      settings.maxTokens = mt;
       saveSettings();
       IX.setSound(settings.sound);
       document.body.classList.toggle('hide-thinking', !settings.showThinking);
@@ -1177,7 +1186,7 @@
       toast('设置已保存');
     });
     $('#resetSettings').addEventListener('click', function () {
-      settings = { key: DEFAULT_KEY, model: DEFAULT_MODEL, sound: true, showThinking: true, fx: true };
+      settings = { key: DEFAULT_KEY, model: DEFAULT_MODEL, sound: true, showThinking: true, fx: true, maxTokens: 3000 };
       saveSettings();
       IX.setSound(true);
       document.body.classList.remove('hide-thinking');

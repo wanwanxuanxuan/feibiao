@@ -62,6 +62,14 @@
 
     var text = normalizeMarkdown(src);
 
+    // 兜底保护：<fx>/<fx_code>/<fx_html> 若泄漏到正文，按代码块保护，
+    // 避免其中的 *、$、` 被 Markdown 行内规则破坏（正常由 app.js 提前抽离）。
+    text = text.replace(/<(fx|fx_code|fx_html)\b([^>]*)>([\s\S]*?)<\/\1>/gi, function (m, tag, attrs, body) {
+      var lang = tag === 'fx_html' ? 'html' : 'js';
+      return add(codeBlock(String(body || ''), lang));
+    });
+    text = text.replace(/<(fx|fx_code|fx_html)\b[^>]*>[\s\S]*$/gi, '');
+
     // 闭合的代码围栏
     text = text.replace(/```([^\n`]*)\n([\s\S]*?)```/g, function (m, lang, code) {
       return add(codeBlock(code, lang));

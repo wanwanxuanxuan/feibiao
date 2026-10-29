@@ -1119,6 +1119,19 @@ body.hide-thinking .thinking { display: none !important; }
   outline: none;
 }
 .key-row input:focus, .settings-body select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+.token-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
+.token-row input {
+  width: 130px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 12.5px;
+  outline: none;
+}
+.token-row input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+.token-hint { font-size: 10.5px; line-height: 1.6; color: var(--muted); }
 .mini-btn {
   flex: none;
   padding: 0 13px;
