@@ -332,12 +332,19 @@
       toast('这个浏览器不支持 AI 自定义特效');
       return;
     }
+    var fellBack = false;
     FXC.run(it.code, {
       duration: it.duration,
       onError: function (msg) {
         window.__fxLastError = msg;
         try { console.error('[fx]', msg); } catch (e) {}
         toast('特效没跑起来：' + msg);
+        if (fellBack) return;
+        fellBack = true;
+        setTimeout(function () {
+          FXC.run(FALLBACK_FX.code, { duration: FALLBACK_FX.duration });
+          toast('换「备用星尘」顶上');
+        }, 350);
       }
     });
   }
