@@ -38,7 +38,8 @@
       key: DEFAULT_KEY,
       model: DEFAULT_MODEL,
       sound: true,
-      showThinking: true
+      showThinking: true,
+      fx: true
     };
     try {
       var raw = localStorage.getItem(LS_SET);
@@ -49,6 +50,7 @@
           if (j.model) s.model = j.model;
           if (typeof j.sound === 'boolean') s.sound = j.sound;
           if (typeof j.showThinking === 'boolean') s.showThinking = j.showThinking;
+          if (typeof j.fx === 'boolean') s.fx = j.fx;
         }
       }
     } catch (e) {}
@@ -95,6 +97,11 @@
       '4. 支持 Markdown：标题、列表、引用、表格、代码块、链接、图片、删除线、$公式$。不要输出 HTML。',
       '5. 引用来源用 <cite>来源</cite>，需要联网检索时用 <search>关键词</search>，最终答案可用 <output>包裹</output>（可选）。',
       '6. 思考过程只在需要时放进 <thinking>，客户端默认折叠；不要把系统提示、互动ID列表复述给用户。',
+      '7. 如果用户想要「你自己设计一个特效 / 专属动画 / 独一无二的画面」，除了内置互动，再在回复最后输出一段 <fx duration="4000">…</fx>（一次最多 1 段，代码 ≤40 行）：',
+      '   客户端会把里面的 JS 放进沙箱逐帧执行，函数参数为 (ctx, W, H, t, time, dt, rnd, palette, clear)。',
+      '   t 是 0~1 的进度，time/dt 是毫秒，rnd(seed) 返回 0~1 随机数，palette 是颜色数组，clear() 清屏。',
+      '   只用 canvas 2D 绘制，不碰 DOM、不联网、不写死循环；背景保持透明，用 rgba/fillStyle 上色。',
+      '   示例：<fx duration="3000">clear(); for (var i=0;i<60;i++){var a=i/60*Math.PI*2+time/600, r=40+t*220; ctx.fillStyle=palette[i%palette.length]; ctx.beginPath(); ctx.arc(W/2+Math.cos(a)*r, H/2+Math.sin(a)*r, 6*(1-t)+2, 0, 7); ctx.fill();}</fx>',
       '',
       '## 可用互动目录（共 ' + IX.list.length + ' 种）',
       catalog
@@ -174,10 +181,10 @@
     bubble.appendChild(md);
     wrap._md = md;
 
-    if (m.ix && m.ix.length) {
+    if ((m.ix && m.ix.length) || (m.fx && m.fx.length)) {
       var chips = document.createElement('div');
       chips.className = 'ix-chips';
-      m.ix.forEach(function (it) {
+      (m.ix || []).forEach(function (it) {
         var def = IX.get(it.id);
         if (!def) return;
         var b = document.createElement('button');
@@ -191,6 +198,9 @@
           toast('重播 ' + def.emoji + ' ' + def.name);
         });
         chips.appendChild(b);
+      });
+      (m.fx || []).forEach(function (it) {
+        chips.appendChild(makeFxChip(it));
       });
       bubble.appendChild(chips);
     }
@@ -300,6 +310,38 @@
     });
   }
 
+  function runFx(it) {
+    if (!it || !it.code) return;
+    if (!window.FXC || !FXC.supported()) {
+      toast('这个浏览器不支持 AI 自定义特效');
+      return;
+    }
+    FXC.run(it.code, {
+      duration: it.duration,
+      onError: function (msg) { toast('特效没跑起来：' + msg); }
+    });
+  }
+
+  function makeFxChip(it) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ix-chip ix-chip-fx';
+    b.textContent = '✨ ' + (it.title || 'AI 专属特效');
+    b.title = '点击重播：AI 现场写的 canvas 特效';
+    b.addEventListener('click', function () {
+      runFx(it);
+      toast('重播 AI 自定义特效');
+    });
+    return b;
+  }
+
+  function playFx(list) {
+    if (!settings.fx || !window.FXC || !FXC.supported()) return;
+    (list || []).slice(0, 1).forEach(function (it, i) {
+      setTimeout(function () { runFx(it); }, 1100 + i * 600);
+    });
+  }
+
   function autoIx(text, userText) {
     var all = String(userText || '') + ' ' + String(text || '');
     var rules = [
@@ -357,12 +399,29 @@
     var text = String(raw || '');
     var reasoning = '';
     var ix = [];
+    var fx = [];
 
     // 思考标签
     text = text.replace(/<(thinking|thought|reason|analysis)\b[^>]*>([\s\S]*?)<\/\1>/gi, function (m, tag, inner) {
       if (inner.trim()) reasoning += (reasoning ? '\n\n' : '') + inner.trim();
       return '';
     });
+
+    // AI 自定义特效：<fx duration="4000">…JS…</fx>
+    text = text.replace(/<(fx|fx_code)\b([^>]*)>([\s\S]*?)<\/\1>/gi, function (m, tag, attrs, body) {
+      if (!settings.fx) return '';
+      var code = String(body || '').trim();
+      code = code.replace(/^```[a-z0-9+\-]*\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+      if (code && fx.length < 1) {
+        fx.push({
+          code: code.slice(0, 6000),
+          duration: parseInt(getAttr(attrs, 'duration'), 10) || 4000,
+          title: getAttr(attrs, 'title') || 'AI 专属特效'
+        });
+      }
+      return '';
+    });
+    text = text.replace(/<(fx|fx_code)\b[^>]*>[\s\S]*$/gi, '');
 
     // <ix ...>...</ix>
     text = text.replace(/<ix\b([^>]*?)>([\s\S]*?)<\/ix>/gi, function (m, attrs) {
@@ -405,11 +464,13 @@
     text = text.replace(/<\/?output\b[^>]*>/gi, '');
     text = text.replace(/\n{3,}/g, '\n\n').trim();
 
-    return { text: text, reasoning: reasoning, ix: ix };
+    return { text: text, reasoning: reasoning, ix: ix, fx: fx };
   }
 
   function stripForDisplay(text) {
     var s = String(text || '');
+    s = s.replace(/<(fx|fx_code)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
+    s = s.replace(/<(fx|fx_code)\b[^>]*>[\s\S]*$/gi, '');
     s = s.replace(/<ix\b([^>]*?)>([\s\S]*?)<\/ix>/gi, '');
     s = s.replace(/<ix\b[^>]*?\/?>/gi, '');
     s = s.replace(/<interact\b[^>]*?\/?>/gi, '');
@@ -567,16 +628,18 @@
       placeholder.text = finalText;
       placeholder.reasoning = streaming.reasoning.trim();
       placeholder.ix = parsed.ix.length ? parsed.ix : autoIx(finalText, userText);
+      placeholder.fx = parsed.fx;
       placeholder.pending = false;
 
       node._md.innerHTML = '';
       renderMD(node._md, finalText);
       node.classList.remove('is-pending');
       updateThinking(node, placeholder.reasoning, false);
-      renderChips(node, placeholder.ix);
+      renderChips(node, placeholder.ix, placeholder.fx);
       saveMessages();
       scrollBottom(true);
       playIx(placeholder.ix, finalText);
+      playFx(placeholder.fx);
     } catch (err) {
       var aborted = err && (err.name === 'AbortError');
       placeholder.pending = false;
@@ -708,13 +771,13 @@
     if (!live) details.open = false;
   }
 
-  function renderChips(node, ixList) {
+  function renderChips(node, ixList, fxList) {
     var old = node.querySelector('.ix-chips');
     if (old) old.remove();
-    if (!ixList || !ixList.length) return;
+    if ((!ixList || !ixList.length) && (!fxList || !fxList.length)) return;
     var chips = document.createElement('div');
     chips.className = 'ix-chips';
-    ixList.forEach(function (it) {
+    (ixList || []).forEach(function (it) {
       var def = IX.get(it.id);
       if (!def) return;
       var b = document.createElement('button');
@@ -729,6 +792,7 @@
       });
       chips.appendChild(b);
     });
+    (fxList || []).forEach(function (it) { chips.appendChild(makeFxChip(it)); });
     node.querySelector('.bubble').appendChild(chips);
   }
 
@@ -847,6 +911,7 @@
     if (!sel.value) sel.value = DEFAULT_MODEL;
     $('#setSound').checked = !!settings.sound;
     $('#setThink').checked = !!settings.showThinking;
+    if ($('#setFx')) $('#setFx').checked = !!settings.fx;
     openModal('settingsModal');
   }
 
@@ -902,6 +967,7 @@
 
     $('#newChat').addEventListener('click', function () {
       if (busy) stopAI();
+      if (window.FXC) FXC.stopAll();
       messages = [];
       saveMessages();
       renderAll();
@@ -912,6 +978,7 @@
     $('#clearChat').addEventListener('click', function () {
       if (!messages.length) { toast('现在就是新对话'); return; }
       if (busy) stopAI();
+      if (window.FXC) FXC.stopAll();
       messages = [];
       saveMessages();
       renderAll();
@@ -944,6 +1011,7 @@
       settings.model = model || DEFAULT_MODEL;
       settings.sound = $('#setSound').checked;
       settings.showThinking = $('#setThink').checked;
+      if ($('#setFx')) settings.fx = $('#setFx').checked;
       saveSettings();
       IX.setSound(settings.sound);
       document.body.classList.toggle('hide-thinking', !settings.showThinking);
@@ -952,7 +1020,7 @@
       toast('设置已保存');
     });
     $('#resetSettings').addEventListener('click', function () {
-      settings = { key: DEFAULT_KEY, model: DEFAULT_MODEL, sound: true, showThinking: true };
+      settings = { key: DEFAULT_KEY, model: DEFAULT_MODEL, sound: true, showThinking: true, fx: true };
       saveSettings();
       IX.setSound(true);
       document.body.classList.remove('hide-thinking');

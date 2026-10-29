@@ -9,7 +9,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238b6cff'/%3E%3Cstop offset='1' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='26' fill='url(%23g)'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='%23fff' font-family='sans-serif' font-weight='bold'%3E谷%3C/text%3E%3C/svg%3E" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.10.0/styles/atom-one-dark.min.css" />
-<link rel="stylesheet" href="./style.css?v=20261028" />
+<link rel="stylesheet" href="./style.css?v=20261029" />
 </head>
 <body>
 
@@ -90,7 +90,8 @@
         <p class="welcome-kicker">谷仓 AI 伙伴</p>
         <h1>我是小谷，<br class="br-m" />住在谷仓里的 AI 伙伴</h1>
         <p class="welcome-sub">
-          我不只会聊天，还会在你的屏幕上表演 —— <b>86 种</b>表情、动作、特效、音效和小工具。
+          我不只会聊天，还会在你的屏幕上表演 —— <b>86 种</b>表情、动作、特效、音效和小工具，
+          甚至能现场写一段代码，给你一个<b>专属特效</b>。
           回复里的 Markdown、公式、思考标签和工具调用，我也会好好处理。
         </p>
 
@@ -112,6 +113,9 @@
           </button>
           <button class="suggest" type="button" data-send="展示一下你的代码能力：写一个 Python 快排，再放个终场烟火">
             <span>💻</span> 代码 + 终场烟火
+          </button>
+          <button class="suggest" type="button" data-send="你自己设计一个独一无二的特效：像星系旋转着坍缩成一颗心，用 &lt;fx&gt; 现场写代码给我看">
+            <span>✨</span> 让 AI 现写一个特效
           </button>
         </div>
 
@@ -208,6 +212,7 @@
 
       <label class="switch"><input id="setSound" type="checkbox" checked /><span>互动音效</span></label>
       <label class="switch"><input id="setThink" type="checkbox" checked /><span>显示思考过程（默认折叠）</span></label>
+      <label class="switch"><input id="setFx" type="checkbox" checked /><span>允许 AI 现场写自定义特效（Web Worker 沙箱运行，最多 12 秒）</span></label>
 
       <div class="settings-actions">
         <button class="btn ghost" type="button" id="resetSettings">恢复默认</button>
@@ -225,8 +230,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.10.0/highlight.min.js" defer></script>
-<script src="./markdown.js?v=20261028" defer></script>
-<script src="./interactions.js?v=20261028" defer></script>
-<script src="./app.js?v=20261028" defer></script>
+<script src="./markdown.js?v=20261029" defer></script>
+<script src="./interactions.js?v=20261029" defer></script>
+<script src="./fx-custom.js?v=20261029" defer></script>
+<script src="./app.js?v=20261029" defer></script>
 </body>
 </html>
