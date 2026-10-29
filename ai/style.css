@@ -828,6 +828,17 @@ body.hide-thinking .thinking { display: none !important; }
 }
 .ix-chip:hover { transform: translateY(-1px); border-color: var(--brand); }
 
+.cmd-tag {
+  display: inline-block;
+  margin-bottom: 7px;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--muted);
+  font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .04em;
+}
+
 .ix-chip-fx {
   border-color: transparent;
   background: linear-gradient(135deg, rgba(139, 108, 255, .28), rgba(34, 211, 238, .28));

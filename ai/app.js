@@ -74,7 +74,7 @@
   }
 
   /* ---------------- 系统提示词 ---------------- */
-  function buildSystemPrompt() {
+  function buildSystemPrompt(forceFx) {
     var order = ['emoji', 'gesture', 'screen', 'sound', 'theme', 'utility', 'text'];
     var catalog = order.map(function (cat) {
       var items = IX.list.filter(function (x) { return x.cat === cat; });
@@ -103,9 +103,18 @@
       '   只用 canvas 2D 绘制，不碰 DOM、不联网、不写死循环；背景保持透明，用 rgba/fillStyle 上色。',
       '   示例：<fx duration="3000">clear(); for (var i=0;i<60;i++){var a=i/60*Math.PI*2+time/600, r=40+t*220; ctx.fillStyle=palette[i%palette.length]; ctx.beginPath(); ctx.arc(W/2+Math.cos(a)*r, H/2+Math.sin(a)*r, 6*(1-t)+2, 0, 7); ctx.fill();}</fx>',
       '',
+      '',
       '## 可用互动目录（共 ' + IX.list.length + ' 种）',
       catalog
-    ].join('\n');
+    ].concat(forceFx ? [
+      '',
+      '## 本轮为强制特效（用户输入了 #z）',
+      '1. 这一轮必须给出自定义特效，不能只靠内置互动。',
+      '2. 正文控制在 80 字以内，直接说你要画什么，不要解释代码。',
+      '3. 回复最后必须输出一段 <fx duration="6000">…</fx>，代码 15~40 行、能直接运行，不要包进 ``` 代码块。',
+      '4. 画面要有明确主体（旋涡、粒子心、雨滴、网格波、萤火虫之类），至少两种颜色。',
+      '5. 拿不准就画安全的粒子或线条动画，不要用网络、DOM、死循环。'
+    ] : []).join('\n');
   }
 
   /* ---------------- 渲染 ---------------- */
@@ -174,6 +183,13 @@
       bubble.appendChild(details);
       wrap._thinking = details;
       wrap._thinkingBody = body;
+    }
+
+    if (m.forceFx) {
+      var tag = document.createElement('div');
+      tag.className = 'cmd-tag';
+      tag.textContent = '#z 强制特效';
+      bubble.appendChild(tag);
     }
 
     var md = document.createElement('div');
@@ -340,7 +356,7 @@
   }
 
   function playFx(list) {
-    if (!settings.fx || !window.FXC || !FXC.supported()) return;
+    if (!window.FXC || !FXC.supported()) return;
     (list || []).slice(0, 1).forEach(function (it, i) {
       setTimeout(function () { runFx(it); }, 1100 + i * 600);
     });
@@ -399,11 +415,12 @@
     if (!id || !IX.has(id)) return;
     out.push({ id: id, args: args || {} });
   }
-  function extractSpecials(raw) {
+  function extractSpecials(raw, allowFx) {
     var text = String(raw || '');
     var reasoning = '';
     var ix = [];
     var fx = [];
+    if (typeof allowFx !== 'boolean') allowFx = !!settings.fx;
 
     // 思考标签
     text = text.replace(/<(thinking|thought|reason|analysis)\b[^>]*>([\s\S]*?)<\/\1>/gi, function (m, tag, inner) {
@@ -413,7 +430,7 @@
 
     // AI 自定义特效：<fx duration="4000">…JS…</fx>
     text = text.replace(/<(fx|fx_code)\b([^>]*)>([\s\S]*?)<\/\1>/gi, function (m, tag, attrs, body) {
-      if (!settings.fx) return '';
+      if (!allowFx) return '';
       var code = String(body || '').trim();
       code = code.replace(/^```[a-z0-9+\-]*\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
       if (code && fx.length < 1) {
@@ -486,8 +503,9 @@
   }
 
   /* ---------------- 对话 ---------------- */
-  function pushUser(text) {
+  function pushUser(text, forceFx) {
     var m = { role: 'user', text: text, ts: Date.now() };
+    if (forceFx) m.forceFx = true;
     messages.push(m);
     saveMessages();
     elWelcome.hidden = true;
@@ -511,6 +529,13 @@
     elInput.setAttribute('aria-busy', v ? 'true' : 'false');
   }
 
+  var FORCE_FX_RE = /^[#＃][zZ](?:[ \t]+([\s\S]*))?$/;
+  var FALLBACK_FX = {
+    duration: 6000,
+    title: '备用星尘',
+    code: 'clear(); for (var i=0;i<110;i++){ var a=i/110*Math.PI*2+time/1600; var r=40+((i*53)%300)+t*140; var x=W/2+Math.cos(a)*r, y=H/2+Math.sin(a)*r*0.62; ctx.globalAlpha=0.9-t*0.6; ctx.fillStyle=palette[i%palette.length]; ctx.beginPath(); ctx.arc(x,y,1.5+(i%4),0,Math.PI*2); ctx.fill(); } ctx.globalAlpha=1;'
+  };
+
   function send(text) {
     text = String(text || '').trim();
     if (!text || busy) return;
@@ -519,10 +544,16 @@
       openSettings();
       return;
     }
+    var forceFx = false;
+    var hit = text.match(FORCE_FX_RE);
+    if (hit) {
+      forceFx = true;
+      text = (hit[1] || '随便来一个 12 秒的特效，主题你定').trim();
+    }
     elInput.value = '';
     autoGrow();
-    pushUser(text);
-    runAI(text);
+    pushUser(text, forceFx);
+    runAI(text, forceFx);
   }
 
   var RETRY_STATUS = { 429: 1, 500: 1, 502: 1, 503: 1, 504: 1 };
@@ -550,7 +581,7 @@
     node._md.appendChild(t);
   }
 
-  async function runAI(userText) {
+  async function runAI(userText, forceFx) {
     var placeholder = {
       role: 'ai', text: '', reasoning: '', ix: [], ts: Date.now(), pending: true
     };
@@ -586,7 +617,7 @@
             },
             body: JSON.stringify({
               model: chain[attempt],
-              messages: [{ role: 'system', content: buildSystemPrompt() }].concat(visibleHistory()),
+              messages: [{ role: 'system', content: buildSystemPrompt(forceFx) }].concat(visibleHistory()),
               stream: true,
               temperature: 0.85,
               max_tokens: 2200,
@@ -620,7 +651,11 @@
       }
 
       var raw = streaming.raw;
-      var parsed = extractSpecials(raw);
+      var parsed = extractSpecials(raw, forceFx || settings.fx);
+      if (forceFx && !parsed.fx.length) {
+        parsed.fx.push({ code: FALLBACK_FX.code, duration: FALLBACK_FX.duration, title: FALLBACK_FX.title });
+        toast('模型这次没交特效，先用「备用星尘」顶上');
+      }
       if (parsed.reasoning) {
         streaming.reasoning = (streaming.reasoning ? streaming.reasoning + '\n\n' : '') + parsed.reasoning;
       }
