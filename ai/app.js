@@ -689,15 +689,28 @@
     } catch (err) {
       var aborted = err && (err.name === 'AbortError');
       placeholder.pending = false;
-      placeholder.text = aborted ? '（已停止这次回答）' : ('出错了：' + (err && err.message ? err.message : '未知错误'));
-      placeholder.reasoning = streaming ? streaming.reasoning : '';
-      placeholder.error = !aborted;
-      node._md.innerHTML = '';
-      var p = document.createElement('p');
-      p.className = aborted ? 'msg-note' : 'msg-error';
-      p.textContent = placeholder.text;
-      node._md.appendChild(p);
       node.classList.remove('is-pending');
+
+      if (forceFx && !aborted) {
+        var partial = extractSpecials(streaming ? streaming.raw : '', true);
+        placeholder.text = '正文断线了，特效先给你。';
+        placeholder.reasoning = streaming ? streaming.reasoning : '';
+        placeholder.ix = partial.ix;
+        placeholder.fx = partial.fx.length ? partial.fx : [{ code: FALLBACK_FX.code, duration: FALLBACK_FX.duration, title: FALLBACK_FX.title }];
+        node._md.innerHTML = '';
+        renderMD(node._md, placeholder.text);
+        renderChips(node, placeholder.ix, placeholder.fx);
+        playFx(placeholder.fx);
+      } else {
+        placeholder.text = aborted ? '（已停止这次回答）' : ('出错了：' + (err && err.message ? err.message : '未知错误'));
+        placeholder.reasoning = streaming ? streaming.reasoning : '';
+        placeholder.error = !aborted;
+        node._md.innerHTML = '';
+        var p = document.createElement('p');
+        p.className = aborted ? 'msg-note' : 'msg-error';
+        p.textContent = placeholder.text;
+        node._md.appendChild(p);
+      }
       saveMessages();
     } finally {
       controller = null;
