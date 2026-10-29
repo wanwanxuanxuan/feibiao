@@ -24,7 +24,7 @@
     '  if(!d||d.type==="stop"){RUN=false;return;}',
     '  CANVAS=d.canvas; CTX=CANVAS.getContext("2d"); DUR=d.duration||4000;',
     '  START=performance.now(); LAST=START; RUN=true;',
-    '  try{ FN=new Function("ctx","W","H","t","time","dt","rnd","palette","clear",d.code); }',
+    '  try{ FN=new Function("ctx","W","H","t","time","dt","rnd","palette","clear","(function(){\\n"+d.code+"\\n})();"); }',
     '  catch(err){ self.postMessage({type:"error",message:"语法错误："+(err&&err.message||err)}); return; }',
     '  function rnd(seed){ var x=Math.sin(seed*12.9898+START*0.001)*43758.5453; return x-Math.floor(x); }',
     '  function clear(){ CTX.clearRect(0,0,CANVAS.width,CANVAS.height); }',
