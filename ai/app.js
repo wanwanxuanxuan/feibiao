@@ -318,7 +318,11 @@
     }
     FXC.run(it.code, {
       duration: it.duration,
-      onError: function (msg) { toast('特效没跑起来：' + msg); }
+      onError: function (msg) {
+        window.__fxLastError = msg;
+        try { console.error('[fx]', msg); } catch (e) {}
+        toast('特效没跑起来：' + msg);
+      }
     });
   }
 

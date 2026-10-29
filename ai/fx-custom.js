@@ -13,6 +13,11 @@
   var live = [];
 
   var WORKER_SRC = [
+    'var window=self;',
+    'var document={createElement:function(t){return new OffscreenCanvas(1,1);}};',
+    'var requestAnimationFrame=function(){return 0;};',
+    'var cancelAnimationFrame=function(){};',
+    'var devicePixelRatio=1;',
     'var CANVAS=null,CTX=null,FN=null,DUR=4000,START=0,LAST=0,RUN=false;',
     'self.onmessage=function(e){',
     '  var d=e.data;',
