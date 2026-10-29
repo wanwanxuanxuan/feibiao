@@ -74,7 +74,10 @@
   }
 
   /* ---------------- 系统提示词 ---------------- */
-  function buildSystemPrompt(forceFx) {
+  function buildSystemPrompt(opts) {
+    opts = opts || {};
+    var forceFx = !!opts.forceFx;
+    var forceHtml = !!opts.forceHtml;
     var order = ['emoji', 'gesture', 'screen', 'sound', 'theme', 'utility', 'text'];
     var catalog = order.map(function (cat) {
       var items = IX.list.filter(function (x) { return x.cat === cat; });
@@ -103,10 +106,17 @@
       '   只用 canvas 2D 绘制，不碰 DOM、不联网、不写死循环；背景保持透明，用 rgba/fillStyle 上色。',
       '   示例：<fx duration="3000">clear(); for (var i=0;i<60;i++){var a=i/60*Math.PI*2+time/600, r=40+t*220; ctx.fillStyle=palette[i%palette.length]; ctx.beginPath(); ctx.arc(W/2+Math.cos(a)*r, H/2+Math.sin(a)*r, 6*(1-t)+2, 0, 7); ctx.fill();}</fx>',
       '',
-      '',
       '## 可用互动目录（共 ' + IX.list.length + ' 种）',
       catalog
-    ].concat(forceFx ? [
+    ].concat(forceHtml ? [
+      '',
+      '## 本轮为导出 HTML 特效（用户输入了 #c）',
+      '1. 你必须生成一个完整、可独立运行的 HTML 页面（<!DOCTYPE html> … </html>），里面用 <canvas> + requestAnimationFrame 画一段动画。',
+      '2. 把整个 HTML 内容放在 <fx_html title="页面名">…</fx_html> 标签里，不要用 ``` 代码块包裹。',
+      '3. 页面要自适应窗口，背景色和动画配色协调，画面有明确主体（星空、水波、心形粒子、烟花等）。',
+      '4. 正文控制在 60 字以内，直接说你做了什么，不要解释代码。',
+      '5. 不要引用外部资源（无 CDN、无网络图片），所有代码内联。'
+    ] : forceFx ? [
       '',
       '## 本轮为强制特效（用户输入了 #z）',
       '1. 这一轮必须给出自定义特效，不能只靠内置互动。',
@@ -185,10 +195,10 @@
       wrap._thinkingBody = body;
     }
 
-    if (m.forceFx) {
+    if (m.forceFx || m.forceHtml) {
       var tag = document.createElement('div');
       tag.className = 'cmd-tag';
-      tag.textContent = '#z 强制特效';
+      tag.textContent = m.forceHtml ? '#c 导出 HTML 特效' : '#z 强制特效';
       bubble.appendChild(tag);
     }
 
@@ -197,7 +207,7 @@
     bubble.appendChild(md);
     wrap._md = md;
 
-    if ((m.ix && m.ix.length) || (m.fx && m.fx.length)) {
+    if ((m.ix && m.ix.length) || (m.fx && m.fx.length) || (m.htmlFx && m.htmlFx.length)) {
       var chips = document.createElement('div');
       chips.className = 'ix-chips';
       (m.ix || []).forEach(function (it) {
@@ -217,6 +227,9 @@
       });
       (m.fx || []).forEach(function (it) {
         chips.appendChild(makeFxChip(it));
+      });
+      (m.htmlFx || []).forEach(function (it) {
+        chips.appendChild(makeHtmlChip(it));
       });
       bubble.appendChild(chips);
     }
@@ -362,6 +375,32 @@
     return b;
   }
 
+  function downloadHtml(it) {
+    var blob = new Blob([it.html], { type: 'text/html;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var name = (it.title || 'xiaogu-effect').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40) || 'xiaogu-effect';
+    a.href = url;
+    a.download = name + '.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+  }
+
+  function makeHtmlChip(it) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ix-chip ix-chip-html';
+    b.textContent = '⬇ ' + (it.title || 'AI 专属页面') + ' · 导出 HTML';
+    b.title = '点击下载为可独立运行的 .html 文件';
+    b.addEventListener('click', function () {
+      downloadHtml(it);
+      toast('已导出 ' + ((it.title || '页面') + '.html'));
+    });
+    return b;
+  }
+
   function playFx(list) {
     if (!window.FXC || !FXC.supported()) return;
     (list || []).slice(0, 1).forEach(function (it, i) {
@@ -427,6 +466,7 @@
     var reasoning = '';
     var ix = [];
     var fx = [];
+    var htmlFx = [];
     if (typeof allowFx !== 'boolean') allowFx = !!settings.fx;
 
     // 思考标签
@@ -450,6 +490,20 @@
       return '';
     });
     text = text.replace(/<(fx|fx_code)\b[^>]*>[\s\S]*$/gi, '');
+
+    // AI 导出的完整 HTML 页面：<fx_html title="...">…</fx_html>
+    text = text.replace(/<fx_html\b([^>]*)>([\s\S]*?)<\/fx_html>/gi, function (m, attrs, body) {
+      var html = String(body || '').trim();
+      html = html.replace(/^```(?:html)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+      if (html && htmlFx.length < 1) {
+        htmlFx.push({
+          html: html.slice(0, 60000),
+          title: getAttr(attrs, 'title') || 'AI 专属页面'
+        });
+      }
+      return '';
+    });
+    text = text.replace(/<fx_html\b[^>]*>[\s\S]*$/gi, '');
 
     // <ix ...>...</ix>
     text = text.replace(/<ix\b([^>]*?)>([\s\S]*?)<\/ix>/gi, function (m, attrs) {
@@ -492,13 +546,15 @@
     text = text.replace(/<\/?output\b[^>]*>/gi, '');
     text = text.replace(/\n{3,}/g, '\n\n').trim();
 
-    return { text: text, reasoning: reasoning, ix: ix, fx: fx };
+    return { text: text, reasoning: reasoning, ix: ix, fx: fx, htmlFx: htmlFx };
   }
 
   function stripForDisplay(text) {
     var s = String(text || '');
     s = s.replace(/<(fx|fx_code)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
     s = s.replace(/<(fx|fx_code)\b[^>]*>[\s\S]*$/gi, '');
+    s = s.replace(/<fx_html\b[^>]*>[\s\S]*?<\/fx_html>/gi, '');
+    s = s.replace(/<fx_html\b[^>]*>[\s\S]*$/gi, '');
     s = s.replace(/<ix\b([^>]*?)>([\s\S]*?)<\/ix>/gi, '');
     s = s.replace(/<ix\b[^>]*?\/?>/gi, '');
     s = s.replace(/<interact\b[^>]*?\/?>/gi, '');
@@ -510,9 +566,10 @@
   }
 
   /* ---------------- 对话 ---------------- */
-  function pushUser(text, forceFx) {
+  function pushUser(text, forceFx, forceHtml) {
     var m = { role: 'user', text: text, ts: Date.now() };
     if (forceFx) m.forceFx = true;
+    if (forceHtml) m.forceHtml = true;
     messages.push(m);
     saveMessages();
     elWelcome.hidden = true;
@@ -537,10 +594,15 @@
   }
 
   var FORCE_FX_RE = /^[#＃][zZ](?:[ \t]+([\s\S]*))?$/;
+  var FORCE_HTML_RE = /^[#＃][cC](?:[ \t]+([\s\S]*))?$/;
   var FALLBACK_FX = {
     duration: 6000,
     title: '备用星尘',
     code: 'clear(); for (var i=0;i<110;i++){ var a=i/110*Math.PI*2+time/1600; var r=40+((i*53)%300)+t*140; var x=W/2+Math.cos(a)*r, y=H/2+Math.sin(a)*r*0.62; ctx.globalAlpha=0.9-t*0.6; ctx.fillStyle=palette[i%palette.length]; ctx.beginPath(); ctx.arc(x,y,1.5+(i%4),0,Math.PI*2); ctx.fill(); } ctx.globalAlpha=1;'
+  };
+  var FALLBACK_HTML = {
+    title: '备用星光页',
+    html: '<!DOCTYPE html>\n<html lang="zh">\n<head>\n<meta charset="UTF-8">\n<title>星光</title>\n<style>html,body{margin:0;height:100%;background:#0b0f1a;overflow:hidden;}canvas{display:block;width:100%;height:100%;}</style>\n</head>\n<body>\n<canvas id="c"></canvas>\n<script>\nvar cv=document.getElementById("c"),x=cv.getContext("2d");function rs(){cv.width=innerWidth;cv.height=innerHeight;}rs();addEventListener("resize",rs);var t=0;function loop(){t+=1;x.fillStyle="rgba(11,15,26,.18)";x.fillRect(0,0,cv.width,cv.height);for(var i=0;i<120;i++){var a=i/120*6.283+t/80,r=80+((i*53)%320),px=cv.width/2+Math.cos(a)*r,py=cv.height/2+Math.sin(a)*r*0.6;x.fillStyle="hsl("+(i*3%360)+",80%,70%)";x.beginPath();x.arc(px,py,1.5+(i%3),0,6.283);x.fill();}requestAnimationFrame(loop);}loop();\n<\/script>\n</body>\n</html>'
   };
 
   function send(text) {
@@ -551,16 +613,22 @@
       openSettings();
       return;
     }
-    var forceFx = false;
+    var forceFx = false, forceHtml = false;
     var hit = text.match(FORCE_FX_RE);
     if (hit) {
       forceFx = true;
       text = (hit[1] || '随便来一个 12 秒的特效，主题你定').trim();
+    } else {
+      hit = text.match(FORCE_HTML_RE);
+      if (hit) {
+        forceHtml = true;
+        text = (hit[1] || '随便做一个能导出成 HTML 的特效页面，主题你定').trim();
+      }
     }
     elInput.value = '';
     autoGrow();
-    pushUser(text, forceFx);
-    runAI(text, forceFx);
+    pushUser(text, forceFx, forceHtml);
+    runAI(text, forceFx, forceHtml);
   }
 
   var RETRY_STATUS = { 429: 1, 500: 1, 502: 1, 503: 1, 504: 1 };
@@ -588,13 +656,22 @@
     node._md.appendChild(t);
   }
 
-  async function runAI(userText, forceFx) {
+  async function runAI(userText, forceFx, forceHtml) {
     var placeholder = {
       role: 'ai', text: '', reasoning: '', ix: [], ts: Date.now(), pending: true
     };
     messages.push(placeholder);
     var node = appendMessage(placeholder, true);
     node.classList.add('is-pending');
+    if (forceFx || forceHtml) {
+      placeholder.fxMaking = true;
+      var mk = document.createElement('div');
+      mk.className = 'fx-making';
+      mk.innerHTML = '<span class="fx-dot"></span>AI 正在制作' + (forceHtml ? '页面' : '特效') + '…';
+      node._bubble = node.querySelector('.bubble');
+      node._bubble.insertBefore(mk, node._md);
+      node._fxMaking = mk;
+    }
     showTyping(node);
     scrollBottom(true);
 
@@ -624,7 +701,7 @@
             },
             body: JSON.stringify({
               model: chain[attempt],
-              messages: [{ role: 'system', content: buildSystemPrompt(forceFx) }].concat(visibleHistory()),
+              messages: [{ role: 'system', content: buildSystemPrompt({ forceFx: forceFx, forceHtml: forceHtml }) }].concat(visibleHistory()),
               stream: true,
               temperature: 0.85,
               max_tokens: 2200,
@@ -658,10 +735,14 @@
       }
 
       var raw = streaming.raw;
-      var parsed = extractSpecials(raw, forceFx || settings.fx);
+      var parsed = extractSpecials(raw, forceFx || forceHtml || settings.fx);
       if (forceFx && !parsed.fx.length) {
         parsed.fx.push({ code: FALLBACK_FX.code, duration: FALLBACK_FX.duration, title: FALLBACK_FX.title });
         toast('模型这次没交特效，先用「备用星尘」顶上');
+      }
+      if (forceHtml && !parsed.htmlFx.length) {
+        parsed.htmlFx.push({ html: FALLBACK_HTML.html, title: FALLBACK_HTML.title });
+        toast('模型这次没交页面，先用「备用星光页」顶上');
       }
       if (parsed.reasoning) {
         streaming.reasoning = (streaming.reasoning ? streaming.reasoning + '\n\n' : '') + parsed.reasoning;
@@ -675,13 +756,15 @@
       placeholder.reasoning = streaming.reasoning.trim();
       placeholder.ix = parsed.ix.length ? parsed.ix : autoIx(finalText, userText);
       placeholder.fx = parsed.fx;
+      placeholder.htmlFx = parsed.htmlFx;
       placeholder.pending = false;
 
       node._md.innerHTML = '';
+      if (node._fxMaking) { node._fxMaking.remove(); node._fxMaking = null; }
       renderMD(node._md, finalText);
       node.classList.remove('is-pending');
       updateThinking(node, placeholder.reasoning, false);
-      renderChips(node, placeholder.ix, placeholder.fx);
+      renderChips(node, placeholder.ix, placeholder.fx, placeholder.htmlFx);
       saveMessages();
       scrollBottom(true);
       playIx(placeholder.ix, finalText);
@@ -690,6 +773,7 @@
       var aborted = err && (err.name === 'AbortError');
       placeholder.pending = false;
       node.classList.remove('is-pending');
+      if (node._fxMaking) { node._fxMaking.remove(); node._fxMaking = null; }
 
       if (forceFx && !aborted) {
         var partial = extractSpecials(streaming ? streaming.raw : '', true);
@@ -701,6 +785,15 @@
         renderMD(node._md, placeholder.text);
         renderChips(node, placeholder.ix, placeholder.fx);
         playFx(placeholder.fx);
+      } else if (forceHtml && !aborted) {
+        var partialH = extractSpecials(streaming ? streaming.raw : '', true);
+        placeholder.text = '正文断线了，页面先给你。';
+        placeholder.reasoning = streaming ? streaming.reasoning : '';
+        placeholder.ix = partialH.ix;
+        placeholder.htmlFx = partialH.htmlFx.length ? partialH.htmlFx : [{ html: FALLBACK_HTML.html, title: FALLBACK_HTML.title }];
+        node._md.innerHTML = '';
+        renderMD(node._md, placeholder.text);
+        renderChips(node, placeholder.ix, [], placeholder.htmlFx);
       } else {
         placeholder.text = aborted ? '（已停止这次回答）' : ('出错了：' + (err && err.message ? err.message : '未知错误'));
         placeholder.reasoning = streaming ? streaming.reasoning : '';
@@ -830,10 +923,10 @@
     if (!live) details.open = false;
   }
 
-  function renderChips(node, ixList, fxList) {
+  function renderChips(node, ixList, fxList, htmlList) {
     var old = node.querySelector('.ix-chips');
     if (old) old.remove();
-    if ((!ixList || !ixList.length) && (!fxList || !fxList.length)) return;
+    if ((!ixList || !ixList.length) && (!fxList || !fxList.length) && (!htmlList || !htmlList.length)) return;
     var chips = document.createElement('div');
     chips.className = 'ix-chips';
     (ixList || []).forEach(function (it) {
@@ -852,6 +945,7 @@
       chips.appendChild(b);
     });
     (fxList || []).forEach(function (it) { chips.appendChild(makeFxChip(it)); });
+    (htmlList || []).forEach(function (it) { chips.appendChild(makeHtmlChip(it)); });
     node.querySelector('.bubble').appendChild(chips);
   }
 
