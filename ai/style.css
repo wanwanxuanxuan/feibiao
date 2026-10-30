@@ -974,11 +974,62 @@ body.hide-thinking .thinking { display: none !important; }
 .mic-btn:hover { color: var(--text); border-color: var(--brand); }
 .mic-btn:active { transform: scale(.96); }
 .mic-btn.unsupported { opacity: .45; }
-.mic-btn.listening {
+.mic-btn.listening,
+.mic-btn.realtime {
   color: #fff;
   border-color: transparent;
   background: linear-gradient(135deg, #ef4444, #f97316);
   animation: micPulse 1.3s ease-in-out infinite;
+}
+.voice-bar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 9px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(239, 68, 68, .35);
+  background: rgba(239, 68, 68, .09);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  font-size: 12.5px;
+  color: var(--text);
+  animation: voiceBarIn .24s ease;
+}
+.voice-bar[hidden] { display: none; }
+.voice-live-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: voiceDot 1.1s ease-in-out infinite;
+}
+.voice-state {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.voice-exit {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(239, 68, 68, .45);
+  background: transparent;
+  color: #f87171;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.voice-exit:hover { background: rgba(239, 68, 68, .16); color: #fca5a5; }
+@keyframes voiceDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .35; transform: scale(.75); }
+}
+@keyframes voiceBarIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
 }
 .composer.voice-on { border-color: #ef4444; box-shadow: 0 0 0 4px rgba(239, 68, 68, .16), var(--shadow); }
 @keyframes micPulse {

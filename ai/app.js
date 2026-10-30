@@ -30,7 +30,7 @@
   var renderTimer = 0;
   var lastAutoIx = '';
 
-  var elMessages, elChat, elWelcome, elInput, elSend, elStop, elModelChip, elMic;
+  var elMessages, elChat, elWelcome, elInput, elSend, elStop, elModelChip, elMic, elVoiceBar, elVoiceState;
 
   /* ---------------- 设置与存储 ---------------- */
   function loadSettings() {
@@ -40,6 +40,7 @@
       sound: true,
       showThinking: true,
       fx: true,
+      speak: true,
       maxTokens: 3000
     };
     try {
@@ -52,6 +53,7 @@
           if (typeof j.sound === 'boolean') s.sound = j.sound;
           if (typeof j.showThinking === 'boolean') s.showThinking = j.showThinking;
           if (typeof j.fx === 'boolean') s.fx = j.fx;
+          if (typeof j.speak === 'boolean') s.speak = j.speak;
           var mt = parseInt(j.maxTokens, 10);
           if (mt >= 500 && mt <= 32000) s.maxTokens = mt;
         }
@@ -612,11 +614,18 @@
 
   function send(text) {
     text = String(text || '').trim();
-    if (!text || busy) return;
+    if (!text) { if (rt.on) rtResume(); return; }
+    if (busy) { if (rt.on) rtResume(); return; }
     if (voice.on) finishVoice(true);
+    if (rt.on && !rt.waiting) {
+      rt.waiting = true;
+      rtPauseListen();
+      rtSetState('小谷思考中…', 'thinking');
+    }
     if (!settings.key) {
       toast('请先在设置里填写 API Key');
       openSettings();
+      if (rt.on) rtResume();
       return;
     }
     var forceFx = false, forceHtml = false;
@@ -819,6 +828,7 @@
       streaming = null;
       setBusy(false);
       scrollBottom();
+      if (rt.on) rtAfterReply(placeholder);
     }
   }
 
@@ -1074,6 +1084,7 @@
     $('#setSound').checked = !!settings.sound;
     $('#setThink').checked = !!settings.showThinking;
     if ($('#setFx')) $('#setFx').checked = !!settings.fx;
+    if ($('#setSpeak')) $('#setSpeak').checked = !!settings.speak;
     if ($('#setTokens')) $('#setTokens').value = settings.maxTokens;
     openModal('settingsModal');
   }
@@ -1214,14 +1225,16 @@
     elMic.addEventListener('click', function (e) {
       e.preventDefault();
       e.stopPropagation();
-      if (voice.on) finishVoice(false);
-      else startVoice();
+      if (rt.on) { rtStop(); return; }
+      if (voice.on) finishVoice(true);
+      rtStart();
     });
+    if ($('#voiceExit')) $('#voiceExit').addEventListener('click', function () { rtStop(); });
 
     // 长按输入框 650ms 启动语音（拖动超过 12px 视为选字，取消）
     elInput.addEventListener('pointerdown', function (e) {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      if (voice.on) return;
+      if (voice.on || rt.on) return;
       voice.sx = e.clientX;
       voice.sy = e.clientY;
       if (voice.timer) clearTimeout(voice.timer);
@@ -1247,6 +1260,225 @@
     elInput.addEventListener('contextmenu', function (e) {
       if (voice.on) e.preventDefault();
     });
+  }
+
+  /* ---------------- 实时语音聊天（豆包式：持续聆听 + 停顿自动发送 + 回复朗读） ---------------- */
+  var rt = {
+    on: false,
+    rec: null,
+    waiting: false,
+    final: '',
+    timer: 0,
+    speaking: false,
+    restartTimer: 0
+  };
+
+  function rtSetState(txt, kind) {
+    if (elVoiceState) elVoiceState.textContent = txt;
+    if (elVoiceBar) {
+      elVoiceBar.hidden = false;
+      elVoiceBar.dataset.kind = kind || 'listening';
+    }
+  }
+
+  function rtBumpSilence() {
+    if (rt.timer) clearTimeout(rt.timer);
+    rt.timer = setTimeout(function () {
+      rt.timer = 0;
+      rtSendNow();
+    }, 1300);
+  }
+
+  function rtPauseListen() {
+    if (rt.timer) { clearTimeout(rt.timer); rt.timer = 0; }
+    if (rt.restartTimer) { clearTimeout(rt.restartTimer); rt.restartTimer = 0; }
+    if (rt.rec) {
+      var r = rt.rec;
+      rt.rec = null;
+      try { r.onend = null; r.onresult = null; r.onerror = null; } catch (e) {}
+      try { r.stop(); } catch (e) {}
+      try { r.abort(); } catch (e) {}
+    }
+  }
+
+  function rtSendNow() {
+    if (!rt.on || rt.waiting) return;
+    var text = String(rt.final || '').trim();
+    if (!text) return;
+    rt.final = '';
+    rt.waiting = true;
+    rtPauseListen();
+    elInput.value = '';
+    autoGrow();
+    rtSetState('小谷思考中…', 'thinking');
+    send(text);
+  }
+
+  function rtListen() {
+    if (!rt.on || rt.waiting) return;
+    if (rt.rec) return;
+    if (busy) {
+      rt.restartTimer = setTimeout(rtListen, 600);
+      return;
+    }
+    var rec;
+    try { rec = new SR(); } catch (e) {
+      toast('语音识别初始化失败');
+      rtStop(true);
+      return;
+    }
+    var lang = navigator.language || 'zh-CN';
+    rec.lang = /^zh/i.test(lang) ? 'zh-CN' : lang;
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+
+    rec.onresult = function (ev) {
+      if (!rt.on || rt.waiting) return;
+      var fin = '', itr = '';
+      for (var i = ev.resultIndex; i < ev.results.length; i++) {
+        var r = ev.results[i];
+        if (r.isFinal) fin += r[0].transcript;
+        else itr += r[0].transcript;
+      }
+      if (fin) rt.final += fin;
+      var shown = (rt.final + itr).trim();
+      if (shown) {
+        elInput.value = shown;
+        autoGrow();
+        rtSetState('听你说：' + shown.slice(-36), 'listening');
+        rtBumpSilence();
+      }
+    };
+    rec.onerror = function (ev) {
+      var code = (ev && ev.error) || '';
+      if (code === 'no-speech' || code === 'aborted') return;
+      if (code === 'not-allowed' || code === 'service-not-allowed') {
+        toast('麦克风被拒绝了，请在浏览器地址栏允许麦克风');
+        rtStop(true);
+      } else if (code === 'network') {
+        toast('语音服务连不上，检查一下网络');
+      } else if (code === 'audio-capture') {
+        toast('没找到麦克风设备');
+        rtStop(true);
+      }
+    };
+    rec.onend = function () {
+      rt.rec = null;
+      if (!rt.on || rt.waiting) return;
+      // 浏览器会因静音/超时自动断开，自动续听
+      rt.restartTimer = setTimeout(rtListen, 320);
+    };
+
+    rt.rec = rec;
+    try {
+      rec.start();
+      rtSetState('正在聆听…', 'listening');
+    } catch (e) {
+      rt.rec = null;
+      rt.restartTimer = setTimeout(rtListen, 700);
+    }
+  }
+
+  function rtStart() {
+    if (rt.on) return;
+    if (!SR) {
+      toast('这个浏览器不支持语音输入，建议用 Chrome / Edge / Safari');
+      return;
+    }
+    if (voice.on) finishVoice(true);
+    rt.on = true;
+    rt.waiting = false;
+    rt.final = '';
+    rt.speaking = false;
+    elMic.classList.add('realtime');
+    elMic.setAttribute('aria-pressed', 'true');
+    elMic.title = '实时语音中，点一下结束';
+    elVoiceBar.hidden = false;
+    rtSetState('正在聆听…', 'listening');
+    rtListen();
+    toast('实时语音已开启，直接说话就行');
+  }
+
+  function rtStop(silent) {
+    var wasOn = rt.on;
+    rt.on = false;
+    rt.waiting = false;
+    rt.final = '';
+    rt.speaking = false;
+    rtPauseListen();
+    elInput.value = '';
+    autoGrow();
+    elMic.classList.remove('realtime', 'listening');
+    elMic.setAttribute('aria-pressed', 'false');
+    elMic.title = '点麦克风进入实时语音，长按输入框仅听写';
+    if (elVoiceBar) elVoiceBar.hidden = true;
+    try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
+    if (!silent && wasOn) toast('实时语音已结束');
+  }
+
+  function rtResume() {
+    if (!rt.on) return;
+    rt.waiting = false;
+    rtSetState('正在聆听…', 'listening');
+    if (rt.restartTimer) clearTimeout(rt.restartTimer);
+    rt.restartTimer = setTimeout(function () {
+      rt.restartTimer = 0;
+      rtListen();
+    }, 260);
+  }
+
+  function speakable(text) {
+    var s = String(text || '');
+    s = s.replace(/```[\s\S]*?```/g, '，这段代码我略过。');
+    s = s.replace(/<(fx|fx_html|thinking|thought|reason|analysis)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
+    s = s.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
+    s = s.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
+    s = s.replace(/<[^>]+>/g, '');
+    s = s.replace(/[#*_`>~|]/g, '');
+    s = s.replace(/\s+/g, ' ').trim();
+    return s.slice(0, 500);
+  }
+
+  function rtSpeak(text) {
+    var said = speakable(text);
+    if (!said || !window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+      rtResume();
+      return;
+    }
+    try {
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(said);
+      u.lang = 'zh-CN';
+      u.rate = 1.05;
+      u.pitch = 1.02;
+      var done = false;
+      var fin = function () {
+        if (done) return;
+        done = true;
+        rt.speaking = false;
+        rtResume();
+      };
+      u.onend = fin;
+      u.onerror = fin;
+      rt.speaking = true;
+      rtSetState('小谷正在说…', 'speaking');
+      window.speechSynthesis.speak(u);
+      setTimeout(fin, Math.min(30000, 1800 + said.length * 190));
+    } catch (e) {
+      rtResume();
+    }
+  }
+
+  function rtAfterReply(msg) {
+    if (!rt.on) return;
+    var text = msg && msg.text ? msg.text : '';
+    var bad = !text || (msg && msg.error) || /^（已停止|^出错了/.test(text);
+    if (bad || !settings.speak) {
+      rtResume();
+      return;
+    }
+    rtSpeak(text);
   }
 
   /* ---------------- 事件绑定 ---------------- */
@@ -1311,6 +1543,7 @@
       settings.sound = $('#setSound').checked;
       settings.showThinking = $('#setThink').checked;
       if ($('#setFx')) settings.fx = $('#setFx').checked;
+      if ($('#setSpeak')) settings.speak = $('#setSpeak').checked;
       var mt = parseInt($('#setTokens').value, 10);
       if (isNaN(mt) || mt < 500) mt = 3000;
       if (mt > 32000) mt = 32000;
@@ -1323,7 +1556,7 @@
       toast('设置已保存');
     });
     $('#resetSettings').addEventListener('click', function () {
-      settings = { key: DEFAULT_KEY, model: DEFAULT_MODEL, sound: true, showThinking: true, fx: true, maxTokens: 3000 };
+      settings = { key: DEFAULT_KEY, model: DEFAULT_MODEL, sound: true, showThinking: true, fx: true, speak: true, maxTokens: 3000 };
       saveSettings();
       IX.setSound(true);
       document.body.classList.remove('hide-thinking');
@@ -1419,6 +1652,8 @@
     elStop = $('#stopBtn');
     elModelChip = $('#modelChip');
     elMic = $('#micBtn');
+    elVoiceBar = $('#voiceBar');
+    elVoiceState = $('#voiceState');
 
     IX.init();
     IX.setSound(settings.sound);
