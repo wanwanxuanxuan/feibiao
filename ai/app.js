@@ -1211,9 +1211,6 @@
       elMic.classList.add('unsupported');
       elMic.title = '当前浏览器不支持语音输入';
     }
-    elMic.addEventListener('pointerdown', function (e) {
-      e.preventDefault();
-    });
     elMic.addEventListener('click', function (e) {
       e.preventDefault();
       e.stopPropagation();
