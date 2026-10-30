@@ -30,7 +30,7 @@
   var renderTimer = 0;
   var lastAutoIx = '';
 
-  var elMessages, elChat, elWelcome, elInput, elSend, elStop, elModelChip;
+  var elMessages, elChat, elWelcome, elInput, elSend, elStop, elModelChip, elMic;
 
   /* ---------------- 设置与存储 ---------------- */
   function loadSettings() {
@@ -613,6 +613,7 @@
   function send(text) {
     text = String(text || '').trim();
     if (!text || busy) return;
+    if (voice.on) finishVoice(true);
     if (!settings.key) {
       toast('请先在设置里填写 API Key');
       openSettings();
@@ -1112,6 +1113,145 @@
     elInput.style.height = Math.min(180, elInput.scrollHeight) + 'px';
   }
 
+  /* ---------------- 语音输入 ---------------- */
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  var voice = { rec: null, on: false, base: '', caret: 0, final: '', interim: '', timer: 0, sx: 0, sy: 0 };
+
+  function setVoiceUI(on) {
+    voice.on = on;
+    if (elMic) {
+      elMic.classList.toggle('listening', on);
+      elMic.setAttribute('aria-pressed', on ? 'true' : 'false');
+      elMic.title = on ? '正在听…点一下结束' : '点麦克风或长按输入框语音输入';
+    }
+    var comp = $('#composer');
+    if (comp) comp.classList.toggle('voice-on', on);
+  }
+
+  function startVoice() {
+    if (voice.on) return;
+    if (!SR) {
+      toast('这个浏览器不支持语音输入，建议用 Chrome / Edge / Safari');
+      return;
+    }
+    var rec;
+    try { rec = new SR(); } catch (e) { toast('语音识别初始化失败'); return; }
+    var lang = navigator.language || 'zh-CN';
+    rec.lang = /^zh/i.test(lang) ? 'zh-CN' : lang;
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+
+    voice.base = elInput.value;
+    voice.caret = typeof elInput.selectionStart === 'number' ? elInput.selectionStart : elInput.value.length;
+    voice.final = '';
+    voice.interim = '';
+
+    rec.onresult = function (ev) {
+      var fin = '', itr = '';
+      for (var i = ev.resultIndex; i < ev.results.length; i++) {
+        var r = ev.results[i];
+        if (r.isFinal) fin += r[0].transcript;
+        else itr += r[0].transcript;
+      }
+      if (fin) voice.final += fin;
+      voice.interim = itr;
+      var ins = voice.final + itr;
+      elInput.value = voice.base.slice(0, voice.caret) + ins + voice.base.slice(voice.caret);
+      var pos = voice.caret + ins.length;
+      try { elInput.setSelectionRange(pos, pos); } catch (e) {}
+      autoGrow();
+    };
+    rec.onerror = function (ev) {
+      var code = (ev && ev.error) || '';
+      if (code === 'not-allowed' || code === 'service-not-allowed') {
+        toast('麦克风被拒绝了，请在浏览器地址栏允许麦克风');
+      } else if (code === 'no-speech') {
+        toast('没听到声音，再试一次？');
+      } else if (code === 'network') {
+        toast('语音服务连不上，检查一下网络');
+      } else if (code !== 'aborted') {
+        toast('语音识别出错：' + code);
+      }
+      finishVoice(true);
+    };
+    rec.onend = function () {
+      if (voice.on) finishVoice(false);
+    };
+
+    voice.rec = rec;
+    try { rec.start(); } catch (e) {
+      voice.rec = null;
+      toast('语音启动失败：' + ((e && e.message) || e));
+      return;
+    }
+    setVoiceUI(true);
+    toast('🎙 开始听了，说完点一下麦克风结束');
+  }
+
+  function finishVoice(silent) {
+    var had = !!(voice.final || voice.interim);
+    if (voice.rec) {
+      var r = voice.rec;
+      voice.rec = null;
+      try { r.onend = null; r.onresult = null; r.onerror = null; } catch (e) {}
+      try { r.stop(); } catch (e) {}
+      try { r.abort(); } catch (e) {}
+    }
+    if (voice.timer) { clearTimeout(voice.timer); voice.timer = 0; }
+    setVoiceUI(false);
+    voice.interim = '';
+    if (!silent && had) toast('语音输入完成');
+    return had;
+  }
+
+  function bindVoice() {
+    if (!elMic) return;
+    if (!SR) {
+      elMic.classList.add('unsupported');
+      elMic.title = '当前浏览器不支持语音输入';
+    }
+    elMic.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+    });
+    elMic.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (voice.on) finishVoice(false);
+      else startVoice();
+    });
+
+    // 长按输入框 650ms 启动语音（拖动超过 12px 视为选字，取消）
+    elInput.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (voice.on) return;
+      voice.sx = e.clientX;
+      voice.sy = e.clientY;
+      if (voice.timer) clearTimeout(voice.timer);
+      voice.timer = setTimeout(function () {
+        voice.timer = 0;
+        if (voice.on) return;
+        startVoice();
+        if (voice.on) { try { elInput.blur(); } catch (err) {} }
+      }, 650);
+    });
+    elInput.addEventListener('pointermove', function (e) {
+      if (!voice.timer) return;
+      if (Math.abs(e.clientX - voice.sx) > 12 || Math.abs(e.clientY - voice.sy) > 12) {
+        clearTimeout(voice.timer);
+        voice.timer = 0;
+      }
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (evt) {
+      elInput.addEventListener(evt, function () {
+        if (voice.timer) { clearTimeout(voice.timer); voice.timer = 0; }
+      });
+    });
+    elInput.addEventListener('contextmenu', function (e) {
+      if (voice.on) e.preventDefault();
+    });
+  }
+
   /* ---------------- 事件绑定 ---------------- */
   function bind() {
     $('#composer').addEventListener('submit', function (e) {
@@ -1200,6 +1340,8 @@
       this.textContent = i.type === 'password' ? '显示' : '隐藏';
     });
 
+    bindVoice();
+
     var cycleTheme = function () {
       var cur = IX.currentTheme();
       var idx = IX.themes.indexOf(cur);
@@ -1279,6 +1421,7 @@
     elSend = $('#sendBtn');
     elStop = $('#stopBtn');
     elModelChip = $('#modelChip');
+    elMic = $('#micBtn');
 
     IX.init();
     IX.setSound(settings.sound);

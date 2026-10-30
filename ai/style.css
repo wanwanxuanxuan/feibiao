@@ -958,7 +958,33 @@ body.hide-thinking .thinking { display: none !important; }
   background: var(--panel-2);
   font-size: 9.5px;
 }
-.send-wrap { display: flex; }
+.send-wrap { display: flex; align-items: center; }
+.mic-btn {
+  width: 40px;
+  height: 40px;
+  margin-right: 8px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-2);
+  color: var(--muted);
+  transition: color .16s, border-color .16s, background .16s, transform .16s, box-shadow .2s;
+}
+.mic-btn:hover { color: var(--text); border-color: var(--brand); }
+.mic-btn:active { transform: scale(.96); }
+.mic-btn.unsupported { opacity: .45; }
+.mic-btn.listening {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  animation: micPulse 1.3s ease-in-out infinite;
+}
+.composer.voice-on { border-color: #ef4444; box-shadow: 0 0 0 4px rgba(239, 68, 68, .16), var(--shadow); }
+@keyframes micPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, .45); }
+  50% { box-shadow: 0 0 0 9px rgba(239, 68, 68, 0); }
+}
 .send-btn {
   width: 40px;
   height: 40px;
@@ -1866,6 +1892,7 @@ body.focus-mode .focus-face { color: var(--brand-2); }
   .composer textarea { font-size: 14px; }
   .composer-foot { margin-top: 2px; }
   .send-btn { width: 36px; height: 36px; }
+  .mic-btn { width: 36px; height: 36px; margin-right: 6px; }
 }
 @media (max-width: 420px) {
   .quick-emoji:nth-of-type(n+6) { display: none; }
