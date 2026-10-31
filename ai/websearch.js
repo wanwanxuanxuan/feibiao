@@ -48,20 +48,22 @@ window.WEBSEARCH = (function () {
     var s = String(q)
       .replace(/[？?！!。，,、：:；;“”"'《》]/g, ' ')
       .replace(/(帮我|请问|告诉我|查一下|搜一下|了解一下)/g, ' ')
-      .replace(/(最近|今天|现在|目前|有什么|有哪些|是什么|为什么|怎么|怎样|如何|多少|谁是|吗|呢|啊|吧)/g, ' ')
-      .replace(/(拿过哪些奖|有哪些奖|是谁唱的|是谁|哪一年|什么时候|怎么样|在哪里|的资料|的简介|简介|介绍|资料)/g, ' ')
+      .replace(/(最近|今天|现在|目前|吗|呢|啊|吧)/g, ' ')
+      // 先删长短语，再删短词，避免「有哪些」把「拿过哪些奖」切碎
+      .replace(/(拿过哪些奖|获得过哪些奖|有哪些奖|这首歌|这首|那首|是谁唱的|有什么|有哪些|是什么|为什么|怎么|怎样|如何|多少|谁是|哪一年|什么时候|怎么样|在哪里|的资料|的简介|简介|介绍|资料)/g, ' ')
       .replace(/\s+/g, ' ').trim();
     var keys = [];
-    if (s) keys.push(s.slice(0, 20));
-    s.split(' ').forEach(function (x) {
-      if (x.length >= 2 && keys.indexOf(x) === -1) keys.push(x);
-    });
-    return keys.slice(0, 3);
+    function add(x) { if (x && x.length >= 2 && keys.indexOf(x) === -1) keys.push(x); }
+    add(s.slice(0, 20));
+    s.split(' ').forEach(add);
+    var joined = s.replace(/\s+/g, '');
+    [8, 6, 4, 3].forEach(function (n) { if (joined.length > n) add(joined.slice(0, n)); });
+    return keys.slice(0, 5);
   }
 
   function baikeOne(key) {
     return jsonp('https://baike.baidu.com/api/openapi/BaikeLemmaCardApi?scope=103&format=json&appid=379020&bk_length=1200' +
-      '&bk_key=' + encodeURIComponent(key), 6000).then(function (j) {
+      '&bk_key=' + encodeURIComponent(key), 3500).then(function (j) {
       if (!j || !j.title) return [];
       var body = String(j.abstract || j.desc || '').replace(/\s+/g, ' ').trim();
       return [{
@@ -73,12 +75,20 @@ window.WEBSEARCH = (function () {
     });
   }
 
+  // 串行试词条（并发会被百度限流成空对象），命中即停
   function baike(q) {
     var keys = baikeKeys(q);
     if (!keys.length) return Promise.resolve([]);
-    return Promise.all(keys.map(baikeOne)).then(function (lists) {
-      return lists.filter(function (l) { return l && l.length; })[0] || [];
-    });
+    var i = 0;
+    function next() {
+      if (i >= keys.length) return Promise.resolve([]);
+      var key = keys[i++];
+      return baikeOne(key).then(function (list) {
+        if (list && list.length) return list;
+        return next();
+      });
+    }
+    return next();
   }
 
   /* ---------------- 维基百科 ---------------- */
@@ -147,22 +157,24 @@ window.WEBSEARCH = (function () {
     return out;
   }
 
-  /* 收满 count 条就提前返回，最多等 ms 毫秒（不让慢代理拖住聊天） */
+  /* 收满 count 条就提前返回；已有结果后再等 0.7 秒收其他源；最多等 ms 毫秒 */
   function gather(promises, count, ms) {
     return new Promise(function (resolve) {
-      var parts = [], done = false;
-      var timer = setTimeout(function () { finish(); }, ms);
+      var parts = [], done = false, grace = 0;
+      var timer = setTimeout(finish, ms);
       function finish() {
         if (done) return;
         done = true;
         clearTimeout(timer);
+        clearTimeout(grace);
         resolve(mergeAll(parts));
       }
       promises.forEach(function (p) {
         p.then(function (list) {
           if (done || !list || !list.length) return;
           parts.push(list);
-          if (mergeAll(parts).length >= count) finish();
+          if (mergeAll(parts).length >= count) return finish();
+          if (!grace) grace = setTimeout(finish, 700);
         });
       });
     });
@@ -178,9 +190,9 @@ window.WEBSEARCH = (function () {
       wiki('zh', text, false),
       wiki('zh', text, true),
       bing(text)
-    ], 3, 6000).then(function (list) {
-      if (list.length >= 2) return list;
-      return gather([wiki('en', text, false), wiki('en', text, true), duck(text)], 1, 5000).then(function (more) {
+    ], 2, 5000).then(function (list) {
+      if (list.length) return list;
+      return gather([wiki('en', text, false), wiki('en', text, true), duck(text)], 1, 3000).then(function (more) {
         return merge(list, more);
       });
     }).then(function (list) {
