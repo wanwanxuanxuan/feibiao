@@ -219,6 +219,17 @@
     return a;
   }
 
+  // 用户明确点歌时（放一首晴天），客户端直接从原话里取歌名，比模型给的 q 更准
+  function guessSong(text) {
+    var raw = String(text || '');
+    var m = raw.match(/[放来播听](?:一|两|几)?[首支]\s*[《「"']?([^，。！？,.!?》」"'、\s]{2,12})/);
+    if (!m) m = raw.match(/[放来播听].{0,10}的([^，。！？,.!?》」"'、\s]{1,12})/);
+    if (!m) return '';
+    var s = m[1];
+    if (/^(歌|音乐|曲子|歌曲|点|些|首|支)/.test(s)) return '';
+    return s;
+  }
+
   function renderSearchCard(host, query, results) {
     if (!host || !results || !results.length) return;
     var card = document.createElement('div');
@@ -832,7 +843,11 @@
 
           await readStream(res, streaming);
 
-          if (!streaming.raw.trim() && !streaming.reasoning.trim()) {
+          var visible = streaming.raw
+            .replace(/<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi, '')
+            .replace(/<music\b[^>]*\/?>/gi, '')
+            .trim();
+          if (!visible) {
             var emptyErr = new Error('模型这次没有返回内容，请再试一次。');
             emptyErr.retryable = true;
             throw emptyErr;
@@ -889,7 +904,8 @@
       playIx(placeholder.ix, finalText);
       playFx(placeholder.fx);
       if (placeholder.music.length) {
-        window.MUSIC.play(placeholder.music[0].q, node._md).then(function (track) {
+        var songQ = guessSong(userText) || placeholder.music[0].q;
+        window.MUSIC.play(songQ, node._md).then(function (track) {
           if (!track) toast('没找到这首歌，换个说法我再放');
         });
       }
