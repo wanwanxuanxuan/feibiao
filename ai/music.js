@@ -34,9 +34,20 @@ window.MUSIC = (function () {
       entity: 'song',
       limit: 6
     }).then(function (data) {
-      return (data && data.results ? data.results : []).filter(function (t) {
+      var list = (data && data.results ? data.results : []).filter(function (t) {
         return t && t.previewUrl;
       });
+      // 按和查询词的贴合度排序，避免 iTunes 把不相干的歌排第一
+      var low = String(q || '').toLowerCase();
+      var terms = low.split(/\s+/).filter(Boolean);
+      list.forEach(function (t) {
+        var name = ((t.trackName || '') + ' ' + (t.artistName || '') + ' ' + (t.collectionName || '')).toLowerCase();
+        var s = 0;
+        if (t.trackName && t.trackName.toLowerCase().indexOf(low) > -1) s += 4;
+        terms.forEach(function (w) { if (name.indexOf(w) > -1) s += 2; });
+        t.__score = s;
+      });
+      return list.sort(function (a, b) { return b.__score - a.__score; });
     }).catch(function () { return []; });
   }
 
