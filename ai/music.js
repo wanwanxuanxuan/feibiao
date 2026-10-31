@@ -27,13 +27,12 @@ window.MUSIC = (function () {
   }
 
   function search(q) {
+    // 注意：不能带 country=cn，苹果中国区音乐库为空，会返回 0 条
     return jsonp({
       term: q,
       media: 'music',
       entity: 'song',
-      limit: 6,
-      country: 'cn',
-      lang: 'zh_cn'
+      limit: 6
     }).then(function (data) {
       return (data && data.results ? data.results : []).filter(function (t) {
         return t && t.previewUrl;
