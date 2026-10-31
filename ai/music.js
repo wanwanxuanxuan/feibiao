@@ -151,9 +151,22 @@ window.MUSIC = (function () {
     setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 2800);
   }
 
+  // 把「放首歌听听」「来点音乐吧」这类口令洗成真正的歌名；啥都不剩就用默认轻音乐
+  function cleanQuery(q) {
+    var s = String(q || '').replace(/[「」"'《》？！?！，,。.、：:]/g, ' ').trim();
+    s = s.replace(/(帮我|给我|请|麻烦|你|能|可以|一下)/g, ' ');
+    s = s.replace(/(播放|放|来|播|听)(一|两|几|首|点|些|遍|曲|支){0,2}(歌|音乐|曲子|歌儿|歌曲|音频)?/g, ' ');
+    s = s.replace(/^几个?|吧$/g, ' ').replace(/\s+/g, ' ').trim();
+    return s;
+  }
+
   function play(q, host) {
-    var query = String(q || '').trim() || '轻音乐 piano';
+    var raw = String(q || '').trim();
+    var query = cleanQuery(raw) || '轻音乐 钢琴';
     return search(query).then(function (list) {
+      if (!list.length && query !== raw && raw) return search(raw);
+      return list;
+    }).then(function (list) {
       if (!list.length) return null;
       show(list[0], host);
       return list[0];
