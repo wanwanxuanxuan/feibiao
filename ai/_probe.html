@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>probe</title></head>
+<body>
+<div id="out">start</div>
+<script>
+var out = document.getElementById('out');
+function log(s) { out.textContent += ' | ' + s; }
+function jsonp(url, name, tag, ms) {
+  return new Promise(function (resolve) {
+    var t = setTimeout(function () { log(tag + ':TIMEOUT'); resolve(); }, ms);
+    window[name] = function (d) { clearTimeout(t); log(tag + ':OK ' + JSON.stringify(d).slice(0, 40)); resolve(); };
+    var s = document.createElement('script');
+    s.src = url.replace('CBNAME', name);
+    s.onerror = function () { clearTimeout(t); log(tag + ':ERROR'); resolve(); };
+    document.head.appendChild(s);
+  });
+}
+jsonp('https://baike.baidu.com/api/openapi/BaikeLemmaCardApi?scope=103&format=json&appid=379020&bk_length=600&bk_key=%E5%91%A8%E6%9D%B0%E4%BC%A6&callback=CBNAME', 'cbBaike', 'baike', 8000);
+jsonp('https://itunes.apple.com/search?term=%E6%99%B4%E5%A4%A9&media=music&entity=song&limit=3&callback=CBNAME', 'cbItunes', 'itunes', 8000);
+log('done-init');
+</script>
+</body></html>
