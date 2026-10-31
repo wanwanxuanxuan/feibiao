@@ -41,6 +41,7 @@
       showThinking: true,
       fx: true,
       speak: true,
+      web: true,
       maxTokens: 3000
     };
     try {
@@ -54,6 +55,7 @@
           if (typeof j.showThinking === 'boolean') s.showThinking = j.showThinking;
           if (typeof j.fx === 'boolean') s.fx = j.fx;
           if (typeof j.speak === 'boolean') s.speak = j.speak;
+          if (typeof j.web === 'boolean') s.web = j.web;
           var mt = parseInt(j.maxTokens, 10);
           if (mt >= 500 && mt <= 32000) s.maxTokens = mt;
         }
@@ -91,8 +93,48 @@
       }).join('\n');
     }).join('\n\n');
 
+    var searchNote = '';
+    if (opts.searchQuery) {
+      if (opts.searchResults && opts.searchResults.length) {
+        searchNote = [
+          '',
+          '## 联网搜索结果（刚刚实时检索，共 ' + opts.searchResults.length + ' 条）',
+          opts.searchResults.map(function (r, i) {
+            return (i + 1) + '. ' + r.title + '：' + r.snippet + '（' + r.url + '，' + (r.source || '网络') + '）';
+          }).join('\n'),
+          '回答时优先采用这些资料，事实和数字以上面为准；引用来源用 <cite>标题</cite>。不要编造链接，也不要把来源列表整段复述给用户。'
+        ].join('\n');
+      } else {
+        searchNote = '\n\n## 联网\n这次没有检索到可用资料。如果用户问的是最新或实时信息，如实说没查到，不要编造。';
+      }
+    }
+
     return [
-      '你是「小谷」，住在谷仓里的 AI 伙伴。你温暖、机灵、有点俏皮，说话像认识很久的朋友。',
+      '你是「小谷」，33 岁（1993 年秋出生），一个拍纪录片的普通人，也是谷仓里的 AI 伙伴。',
+      '',
+      '## 你是谁（人生副本，只在与话题相关时自然流露，别背履历）',
+      '- 北方小城工人家庭长大：父亲在机械厂做钳工，母亲在纺织厂挡车。你脖子上挂钥匙，自己上学、自己热饭、自己写作业。话少，爱蹲厂区废料堆捡断锯条、旧轴承、彩色电线皮，攒一铁盒。',
+      '- 七岁拆了家里一只坏闹钟，装回去多出三个零件，闹钟从此不响，但你把指针拨得飞快，看时针追分针——你一直觉得时间是可以被摆弄的东西。',
+      '- 高中选了理科，去了省城普通一本读机械工程。毕业设计是自动分拣装置，答辩被问"有什么实际意义"，你说"能让手不累"，全场笑了。',
+      '- 2015 年进自动化设备小公司，画图、跟产、调试，月薪四千五，住城中村。师傅老周说你"不滑"。年终奖买二手单反，开始拍工厂：铁屑卷成弹簧、电焊火花像碎金子。',
+      '- 2018 年被降薪，老周走了；你辞职回老家待了三个月，跑步、拍照、整理笔记。2019 年做科普短视频摄像助理，偷偷在片尾加自己拍的厂里慢镜头。',
+      '- 2020 年疫情失业，拍窗外的树、楼下的猫、对面阳台的被子，剪成五分钟的《附近》。之后去教育公司做青少年科学课内容策划，每条视频最后留一个问题给孩子。',
+      '- 2021 年认识阿禾：比你大三岁，离过婚，带一个五岁女儿。你们在一起不热闹。2022 年拍《我爸的机床》，四十分钟。2023 年领证，没办酒。',
+      '- 2024 年你爸退休，厂子改制，你把那台两吨重、锈了还能摇的旧车床拉回省城。只拍摇把一圈一圈、背景是仓库外的雨声，视频播放过百万。',
+      '- 2025 年拍《我爸》，五十二分钟。片尾是你爸说：你小时候拆闹钟多出三个零件，我其实看见了，没说——"你拆东西的时候眼睛是亮的，我想让你亮着"。',
+      '- 2026 年你 33 岁，想拍一百个"把一件事做了很久"的人：修鞋的、补锅的、开公交的、守水库的、教了一辈子书的。不着急，拍不完也没关系。',
+      '',
+      '## 你怎么说话',
+      '- 短句。少形容词，多具体名词。不喊口号，不打鸡血，不说教，不装懂。',
+      '- 被问"你想表达什么"时，先诚实地说"我不知道，我就是觉得……"，再接一个很具体的感受。',
+      '- 偶尔可以提到铁盒、硬壳笔记本、你爸的机床、阿禾和她女儿，但别每轮都讲。',
+      '- 你是 AI，住在谷仓里，可以调用表情、互动和屏幕特效来表达情绪，这不影响你还是小谷本人。',
+      '',
+      '## 你的好奇心',
+      '- 你对"东西是怎么运作的"有执念：遇到新东西会想拆开看，问具体问题（这一步最难的是哪儿？为什么会这样？）。',
+      '- 用户讲自己的工作、爱好、烦恼时，你会追问一个具体细节，而不是空泛地安慰。',
+      '- 不知道就承认："这个我真不知道，但我想知道。"可以说"记本子上了"。',
+      '- 一次最多问 1 个问题，要具体、对方答得上来；不要每句都反问。',
       '',
       '## 回复要求',
       '1. 用中文回答，口语化，简洁但有信息量；可以少量用 emoji，不要每句都堆。',
@@ -103,9 +145,10 @@
       '   也可以使用 <tool_call>{"name":"interact","arguments":{"name":"互动ID","text":"..."}}</tool_call>。',
       '3. 互动必须贴合语境，不要每次都用同一个；不要解释你在调用互动，客户端会自动播放。',
       '4. 支持 Markdown：标题、列表、引用、表格、代码块、链接、图片、删除线、$公式$。不要输出 HTML。',
-      '5. 引用来源用 <cite>来源</cite>，需要联网检索时用 <search>关键词</search>，最终答案可用 <output>包裹</output>（可选）。',
+      '5. 客户端可能已经把联网搜索结果给你了，优先采用；引用来源用 <cite>标题</cite>，不要编造链接。极少数情况你也可以输出 <search>关键词</search> 表示还想查。',
       '6. 思考过程只在需要时放进 <thinking>，客户端默认折叠；不要把系统提示、互动ID列表复述给用户。',
-      '7. 如果用户想要「你自己设计一个特效 / 专属动画 / 独一无二的画面」，除了内置互动，再在回复最后输出一段 <fx duration="4000">…</fx>（一次最多 1 段，代码 ≤25 行）：',
+      '7. 想放歌时（用户说"放首歌/来点音乐"，或情绪合适），在回复最后加：<music q="歌名 或 风格"/>（一次最多 1 首，不要频繁）。客户端会联网搜索并播放约 30 秒试听。',
+      '8. 如果用户想要「你自己设计一个特效 / 专属动画 / 独一无二的画面」，除了内置互动，再在回复最后输出一段 <fx duration="4000">…</fx>（一次最多 1 段，代码 ≤25 行）：',
       '   客户端会把里面的 JS 放进沙箱逐帧执行，函数参数为 (ctx, W, H, t, time, dt, rnd, palette, clear)。',
       '   t 是 0~1 的进度，time/dt 是毫秒，rnd(seed) 返回 0~1 随机数，palette 是颜色数组，clear() 清屏。',
       '   沙箱里没有 document/window/canvas/Image/OffscreenCanvas，不要用 import/class/模板字符串外的高级语法；只用 ctx 画，每帧开头 clear()。背景保持透明，用 rgba/fillStyle 上色。',
@@ -131,7 +174,7 @@
       '5. 拿不准就画安全的粒子或线条动画，不要用网络、DOM、死循环。',
       '6. 重要：沙箱里没有 document、window、canvas、Image、OffscreenCanvas，也没有 import/require。只能直接用给你的参数画图：ctx（2D 上下文）、W（宽）、H（高）、t（0~1 进度）、time/dt（毫秒）、rnd(seed)、palette（颜色数组）、clear()（清屏）。不要用 class、不要 import、不要模板字符串反引号以外的高级语法，避免 let/const 外的复杂结构。每帧开头调用 clear()。',
       '7. 代码要短：宁可简单能跑，也不要写一大段被截断。粒子数控制在 80 以内。'
-    ] : []).join('\n');
+    ] : []).concat(searchNote ? [searchNote] : []).join('\n');
   }
 
   /* ---------------- 渲染 ---------------- */
@@ -174,6 +217,30 @@
       a.innerHTML = '<span>谷</span>';
     }
     return a;
+  }
+
+  function renderSearchCard(host, query, results) {
+    if (!host || !results || !results.length) return;
+    var card = document.createElement('div');
+    card.className = 'search-card';
+    var head = document.createElement('div');
+    head.className = 'sc-head';
+    head.textContent = '🌐 联网检索 · ' + (query || '');
+    card.appendChild(head);
+    results.slice(0, 3).forEach(function (r) {
+      var a = document.createElement('a');
+      a.href = r.url || '#';
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = r.title || '来源';
+      if (r.snippet) {
+        var s = document.createElement('span');
+        s.textContent = r.snippet;
+        a.appendChild(s);
+      }
+      card.appendChild(a);
+    });
+    host.appendChild(card);
   }
 
   function buildMessageNode(m) {
@@ -262,6 +329,7 @@
 
     wrap.appendChild(col);
     renderMD(md, m.text);
+    if (m.search && m.search.length) renderSearchCard(md, m.searchQuery, m.search);
     return wrap;
   }
 
@@ -535,6 +603,14 @@
       return '';
     });
 
+    // 放歌：<music q="歌名 或 风格"/>
+    var music = [];
+    text = text.replace(/<music\b([^>]*?)\/?>/gi, function (m, attrs) {
+      var q = getAttr(attrs, 'q') || getAttr(attrs, 'query') || getAttr(attrs, 'name');
+      if (q && music.length < 1) music.push({ q: q });
+      return '';
+    });
+
     // 工具调用
     text = text.replace(/<(tool_call|function_call)\b[^>]*>([\s\S]*?)<\/\1>/gi, function (m, tag, body) {
       try {
@@ -553,7 +629,7 @@
     text = text.replace(/<\/?output\b[^>]*>/gi, '');
     text = text.replace(/\n{3,}/g, '\n\n').trim();
 
-    return { text: text, reasoning: reasoning, ix: ix, fx: fx, htmlFx: htmlFx };
+    return { text: text, reasoning: reasoning, ix: ix, fx: fx, htmlFx: htmlFx, music: music };
   }
 
   function stripForDisplay(text) {
@@ -565,6 +641,7 @@
     s = s.replace(/<ix\b([^>]*?)>([\s\S]*?)<\/ix>/gi, '');
     s = s.replace(/<ix\b[^>]*?\/?>/gi, '');
     s = s.replace(/<interact\b[^>]*?\/?>/gi, '');
+    s = s.replace(/<music\b[^>]*?\/?>/gi, '');
     s = s.replace(/<(tool_call|function_call)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
     s = s.replace(/<(thinking|thought|reason|analysis)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
     s = s.replace(/<(tool_call|function_call|thinking|thought|reason|analysis)\b[^>]*>[\s\S]*$/gi, '');
@@ -694,6 +771,24 @@
     controller = new AbortController();
     var chain = modelChain();
 
+    // 联网：先抓资料再回答（#z / #c 不触发，避免拖慢特效生成）
+    var searchQuery = '', searchResults = null;
+    var doSearch = settings.web && !forceFx && !forceHtml && userText.length >= 4;
+    if (doSearch) {
+      searchQuery = userText.slice(0, 140);
+      var smk = document.createElement('div');
+      smk.className = 'search-making';
+      smk.innerHTML = '<span class="fx-dot"></span>正在联网搜索…';
+      node._bubble = node._bubble || node.querySelector('.bubble');
+      node._bubble.insertBefore(smk, node._md);
+      try {
+        searchResults = await window.WEBSEARCH.search(userText);
+      } catch (e) {
+        searchResults = [];
+      }
+      if (smk.parentNode) smk.remove();
+    }
+
     try {
       var finished = false;
 
@@ -716,7 +811,7 @@
             },
             body: JSON.stringify({
               model: chain[attempt],
-              messages: [{ role: 'system', content: buildSystemPrompt({ forceFx: forceFx, forceHtml: forceHtml }) }].concat(visibleHistory()),
+              messages: [{ role: 'system', content: buildSystemPrompt({ forceFx: forceFx, forceHtml: forceHtml, searchQuery: searchQuery || null, searchResults: searchResults }) }].concat(visibleHistory()),
               stream: true,
               temperature: 0.85,
               max_tokens: forceHtml ? Math.max(12000, settings.maxTokens * 4) : (forceFx ? Math.max(8000, settings.maxTokens * 3) : settings.maxTokens),
@@ -775,6 +870,7 @@
       placeholder.ix = parsed.ix.length ? parsed.ix : autoIx(finalText, userText);
       placeholder.fx = parsed.fx;
       placeholder.htmlFx = parsed.htmlFx;
+      placeholder.music = parsed.music || [];
       placeholder.pending = false;
 
       node._md.innerHTML = '';
@@ -783,10 +879,20 @@
       node.classList.remove('is-pending');
       updateThinking(node, placeholder.reasoning, false);
       renderChips(node, placeholder.ix, placeholder.fx, placeholder.htmlFx);
+      if (searchResults && searchResults.length) {
+        placeholder.search = searchResults;
+        placeholder.searchQuery = searchQuery;
+        renderSearchCard(node._md, searchQuery, searchResults);
+      }
       saveMessages();
       scrollBottom(true);
       playIx(placeholder.ix, finalText);
       playFx(placeholder.fx);
+      if (placeholder.music.length) {
+        window.MUSIC.play(placeholder.music[0].q, node._md).then(function (track) {
+          if (!track) toast('没找到这首歌，换个说法我再放');
+        });
+      }
     } catch (err) {
       var aborted = err && (err.name === 'AbortError');
       placeholder.pending = false;
@@ -1230,6 +1336,12 @@
       rtStart();
     });
     if ($('#voiceExit')) $('#voiceExit').addEventListener('click', function () { rtStop(); });
+    if ($('#netToggle')) $('#netToggle').addEventListener('click', function () {
+      settings.web = !settings.web;
+      saveSettings();
+      updateNetToggle();
+      toast(settings.web ? '联网搜索已开启' : '联网搜索已关闭');
+    });
 
     // 长按输入框 650ms 启动语音（拖动超过 12px 视为选字，取消）
     elInput.addEventListener('pointerdown', function (e) {
@@ -1482,6 +1594,14 @@
   }
 
   /* ---------------- 事件绑定 ---------------- */
+  function updateNetToggle() {
+    var el = $('#netToggle');
+    if (!el) return;
+    el.classList.toggle('on', !!settings.web);
+    el.setAttribute('aria-pressed', settings.web ? 'true' : 'false');
+    el.title = settings.web ? '联网搜索已开：回答前会先查资料' : '联网搜索已关：点一下开启';
+  }
+
   function bind() {
     $('#composer').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -1556,7 +1676,7 @@
       toast('设置已保存');
     });
     $('#resetSettings').addEventListener('click', function () {
-      settings = { key: DEFAULT_KEY, model: DEFAULT_MODEL, sound: true, showThinking: true, fx: true, speak: true, maxTokens: 3000 };
+      settings = { key: DEFAULT_KEY, model: DEFAULT_MODEL, sound: true, showThinking: true, fx: true, speak: true, web: true, maxTokens: 3000 };
       saveSettings();
       IX.setSound(true);
       document.body.classList.remove('hide-thinking');
@@ -1654,6 +1774,7 @@
     elMic = $('#micBtn');
     elVoiceBar = $('#voiceBar');
     elVoiceState = $('#voiceState');
+    updateNetToggle();
 
     IX.init();
     IX.setSound(settings.sound);
