@@ -2244,10 +2244,12 @@
       clearInterval(ticker);
       if (e && e.name === 'AbortError') throw e;
       // 引擎都不可用：退回本地合成，并把原因留在卡片上
+      var reason = (e && e.message) ? e.message : String(e);
+      var hint = stepKey ? '' : '　想稳定生成「按曲风演唱歌词」的歌，去设置里填一个免费的 StepFun Key 就行。';
       updateJob(job.id, {
         progress: 30,
         stage: '线上模型不可用，改用本地合成',
-        note: '线上模型没接上（' + ((e && e.message) ? e.message : String(e)) + '），这次用本地合成兜底，没有人声演唱。'
+        note: '这次没能用线上音乐模型（' + reason + '），已退回本地合成，没有人声。' + hint
       });
       return await runLocalMusic(job, ctl);
     } finally {
@@ -2442,7 +2444,12 @@
     var res2 = await fetch(ACE_BASE + '/gradio_api/call/__call__/' + j.event_id, { signal: signal });
     if (!res2.ok) throw new Error('音乐模型结果读取失败 HTTP ' + res2.status);
     var raw = await res2.text();
-    if (/event:\s*error/.test(raw)) throw new Error('音乐模型生成失败');
+    if (/event:\s*error/.test(raw)) {
+      var em = raw.match(/event:\s*error\s*\n\s*data:\s*(.+)/);
+      var msg = em ? em[1].trim().replace(/^"|"$/g, '') : '';
+      if (msg && msg !== 'null') throw new Error('音乐模型报错：' + msg);
+      throw new Error('免费 GPU 配额不足或排队失败');
+    }
     var payload = '';
     var lines = raw.split('\n');
     for (var i = 0; i < lines.length; i++) {
