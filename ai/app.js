@@ -63,6 +63,8 @@
   // 视频关键帧（走同一个免费接口）
   var VIDEO_FRAMES = 4;
   var VIDEO_FRAME_MS = 2300;
+  // 生成完成后换个主题：视频 → 赛博，音频 → 极光，照片 → 日落
+  var GEN_THEMES = { video: 'cyber', music: 'aurora', image: 'sunset' };
   var LS_JOBS = 'yg_ai_jobs_v1';
 
   var LS_MSG = 'yg_ai_msgs_v1';
@@ -391,6 +393,36 @@
     if (who === 'music') return '音乐 AI · 免费合成';
     if (who === 'image') return '画图 AI · flux';
     return '小谷';
+  }
+
+  // 卡片最后的标签：视频生成 / 音频生成 / 照片生成
+  function genFootText(who) {
+    if (who === 'video') return '🎬 视频生成';
+    if (who === 'music') return '🎵 音频生成';
+    return '🖼 照片生成';
+  }
+
+  // 生成完成时换个主题
+  function applyGenTheme(who) {
+    var name = GEN_THEMES[who];
+    if (!name || typeof IX === 'undefined' || !IX.setTheme) return;
+    if (IX.currentTheme() === name) return;
+    if (IX.setTheme(name)) {
+      syncThemeButton();
+      toast('主题已换成「' + (IX.themeNames[name] || name) + '」');
+    }
+  }
+
+  // 没有真实进度时，用时间估算往上爬（只升不降，到 cap 就停）
+  function startTicker(jobId, expectedMs, cap) {
+    var t0 = Date.now();
+    return setInterval(function () {
+      var j = findJob(jobId);
+      if (!j || j.status !== 'running') return;
+      var el = Date.now() - t0;
+      var p = Math.min(cap, Math.round((el / expectedMs) * cap));
+      if ((j.progress || 0) < p) updateJob(jobId, { progress: p });
+    }, 400);
   }
 
   // 从文本开头解析 @video / @music / @image（含别名）。返回 {who, text} 或 null
@@ -922,13 +954,15 @@
     if (!job) return '任务不存在';
     if (job.status === 'pending') return '排队中…';
     if (job.status === 'running') {
-      var base = job.who === 'video' ? '🎬 视频合成中…' : job.who === 'music' ? '🎵 音乐合成中…' : '🖼 图片生成中…';
-      return job.progress ? base + ' ' + job.progress : base;
+      var base = job.who === 'video' ? '🎬 视频合成中…' : job.who === 'music' ? '🎵 音乐合成中…' : '🖼 照片生成中…';
+      var pct = typeof job.progress === 'number' ? ' ' + job.progress + '%' : '';
+      var stage = job.stage ? '（' + job.stage + '）' : '';
+      return base + pct + stage;
     }
     if (job.status === 'done') {
       if (job.who === 'video') return '✅ 视频生成完成';
       if (job.who === 'music') return '✅ 音乐生成完成';
-      return '✅ 图片生成完成';
+      return '✅ 照片生成完成';
     }
     if (job.status === 'error') return '❌ 生成失败：' + (job.error || '未知错误');
     return job.status;
@@ -1026,6 +1060,12 @@
       actions.appendChild(retry);
     }
     if (actions.children.length) host.appendChild(actions);
+
+    // 卡片最后：这次生成的是什么
+    var foot = document.createElement('div');
+    foot.className = 'gen-foot' + (job.status === 'done' ? ' is-done' : '');
+    foot.textContent = genFootText(job.who);
+    host.appendChild(foot);
   }
 
   function escapeHtml(s) {
@@ -1827,8 +1867,9 @@
       var msg = findMessageByJob(job.id);
       if (msg) msg.pending = false;
       saveMessages();
-      if (ok && opts.summarize !== false) {
-        summarizeGen(job);
+      if (ok) {
+        applyGenTheme(who);
+        if (opts.summarize !== false) summarizeGen(job);
       }
     }).catch(function (e) {
       delete genControllers[job.id];
@@ -1862,37 +1903,42 @@
   // 先用免费的 Pollinations 出几张关键帧，再用 canvas 做推拉镜头 + 交叉淡化，
   // MediaRecorder 录成 WebM。全程在本地跑，不依赖付费接口。
   async function runVideoGen(job, ctl) {
-    updateJob(job.id, { status: 'running', progress: '准备关键帧…' });
-
-    var frames = [];
-    for (var i = 0; i < VIDEO_FRAMES; i++) {
-      if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
-      updateJob(job.id, { progress: '关键帧 ' + (i + 1) + '/' + VIDEO_FRAMES });
-      var seed = hashCode(job.prompt + ' #' + i);
-      var scene = job.prompt + '，镜头 ' + (i + 1) + '，电影感光影，16:9 构图';
-      var drawable;
-      try {
-        var blob = await pollinationsImage(scene, ctl, 960, 540, seed);
-        drawable = await blobToDrawable(blob);
-      } catch (e) {
-        if (e && e.name === 'AbortError') throw e;
-        // 免费图床不通时用本地渐变画面兜底，视频照样能出
-        drawable = gradientFrame(seed);
+    updateJob(job.id, { status: 'running', progress: 2, stage: '准备关键帧' });
+    var ticker = startTicker(job.id, VIDEO_FRAMES * 7000, 54);
+    try {
+      var frames = [];
+      for (var i = 0; i < VIDEO_FRAMES; i++) {
+        if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
+        updateJob(job.id, { stage: '关键帧 ' + (i + 1) + '/' + VIDEO_FRAMES });
+        var seed = hashCode(job.prompt + ' #' + i);
+        var scene = job.prompt + '，镜头 ' + (i + 1) + '，电影感光影，16:9 构图';
+        var drawable;
+        try {
+          var blob = await pollinationsImage(scene, ctl, 960, 540, seed);
+          drawable = await blobToDrawable(blob);
+        } catch (e) {
+          if (e && e.name === 'AbortError') throw e;
+          // 免费图床不通时用本地渐变画面兜底，视频照样能出
+          drawable = gradientFrame(seed);
+        }
+        frames.push(drawable);
       }
-      frames.push(drawable);
+
+      if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
+      clearInterval(ticker);
+      updateJob(job.id, { progress: 55, stage: '录制中' });
+
+      var videoBlob = await recordCanvasVideo(frames, ctl, function (pct) {
+        updateJob(job.id, { progress: 55 + Math.round(pct * 0.44), stage: '录制中' });
+      });
+      var url = URL.createObjectURL(videoBlob);
+      var mime = videoBlob.type || 'video/webm';
+      genMediaCache[job.id] = { url: url, mime: mime };
+      updateJob(job.id, { status: 'done', progress: 100, stage: '', result: { mime: mime, size: videoBlob.size } });
+      return true;
+    } finally {
+      clearInterval(ticker);
     }
-
-    if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
-    updateJob(job.id, { progress: '录制中 0%' });
-
-    var videoBlob = await recordCanvasVideo(frames, ctl, function (pct) {
-      updateJob(job.id, { progress: '录制中 ' + pct + '%' });
-    });
-    var url = URL.createObjectURL(videoBlob);
-    var mime = videoBlob.type || 'video/webm';
-    genMediaCache[job.id] = { url: url, mime: mime };
-    updateJob(job.id, { status: 'done', progress: '', result: { mime: mime, size: videoBlob.size } });
-    return true;
   }
 
   // 免费图像：Pollinations 匿名接口，免 Key，几秒出图；模型依次兜底
@@ -2097,7 +2143,7 @@
   // 音乐：免费音乐模型都被地域封锁，改成浏览器本地作曲（Web Audio）+ WAV 导出。
   // 提示词只用来生成随机种子：和弦走向、音色、鼓点都不一样。
   async function runMusicGen(job, ctl) {
-    updateJob(job.id, { status: 'running', progress: '作曲中…' });
+    updateJob(job.id, { status: 'running', progress: 4, stage: '作曲' });
     if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
 
     var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
@@ -2109,17 +2155,35 @@
     var ctx = new OAC(2, Math.ceil(seconds * sampleRate), sampleRate);
     buildSong(ctx, plan);
 
-    updateJob(job.id, { progress: '混音中…' });
-    var buffer = await ctx.startRendering();
-    if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
+    updateJob(job.id, { progress: 12, stage: '混音' });
+    // 时间估算打底，渲染每到一秒再上报真实进度
+    var ticker = startTicker(job.id, 4000, 78);
+    try {
+      for (var s = 1; s < Math.ceil(seconds); s++) {
+        (function (t) {
+          try {
+            ctx.suspend(t).then(function () {
+              updateJob(job.id, { progress: Math.max(12, Math.round(12 + (t / seconds) * 68)), stage: '混音' });
+              ctx.resume();
+            }).catch(function () {});
+          } catch (e) {}
+        })(s);
+      }
 
-    updateJob(job.id, { progress: '导出中…' });
-    var blob = encodeWav(buffer);
-    var url = URL.createObjectURL(blob);
-    var secondsOut = Math.round(buffer.duration);
-    genMediaCache[job.id] = { url: url, mime: 'audio/wav', seconds: secondsOut };
-    updateJob(job.id, { status: 'done', progress: '', result: { mime: 'audio/wav', size: blob.size, seconds: secondsOut } });
-    return true;
+      var buffer = await ctx.startRendering();
+      clearInterval(ticker);
+      if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
+
+      updateJob(job.id, { progress: 88, stage: '导出' });
+      var blob = encodeWav(buffer);
+      var url = URL.createObjectURL(blob);
+      var secondsOut = Math.round(buffer.duration);
+      genMediaCache[job.id] = { url: url, mime: 'audio/wav', seconds: secondsOut };
+      updateJob(job.id, { status: 'done', progress: 100, stage: '', result: { mime: 'audio/wav', size: blob.size, seconds: secondsOut } });
+      return true;
+    } finally {
+      clearInterval(ticker);
+    }
   }
 
   function makeSongPlan(prompt) {
@@ -2278,14 +2342,20 @@
 
   // 图片：Pollinations 免费接口（免 Key），flux / turbo / sana 依次兜底
   async function runImageGen(job, ctl) {
-    updateJob(job.id, { status: 'running', progress: '画图中…' });
-    var seed = hashCode(job.prompt);
-    var blob = await pollinationsImage(job.prompt, ctl, 1024, 1024, seed);
-    var url = URL.createObjectURL(blob);
-    var mime = blob.type || 'image/jpeg';
-    genMediaCache[job.id] = { url: url, mime: mime };
-    updateJob(job.id, { status: 'done', progress: '', result: { mime: mime, size: blob.size } });
-    return true;
+    updateJob(job.id, { status: 'running', progress: 3, stage: '绘制' });
+    var ticker = startTicker(job.id, 7000, 92);
+    try {
+      var seed = hashCode(job.prompt);
+      var blob = await pollinationsImage(job.prompt, ctl, 1024, 1024, seed);
+      clearInterval(ticker);
+      var url = URL.createObjectURL(blob);
+      var mime = blob.type || 'image/jpeg';
+      genMediaCache[job.id] = { url: url, mime: mime };
+      updateJob(job.id, { status: 'done', progress: 100, stage: '', result: { mime: mime, size: blob.size } });
+      return true;
+    } finally {
+      clearInterval(ticker);
+    }
   }
 
   // 页面加载后，把还没结束的任务续跑起来
