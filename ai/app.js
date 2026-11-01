@@ -2196,15 +2196,14 @@
       clearInterval(ticker);
 
       if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
-      updateJob(job.id, { progress: 92, stage: '下载' });
-      var blob = await fetchBlob(mp3Url, ctl, 60000);
-      if (!blob || blob.size < 2048) throw new Error('音乐文件为空');
-      var url = URL.createObjectURL(blob);
-      var mime = blob.type || 'audio/mpeg';
+      // 直接播远程 mp3（省一次大文件下载，播放更快）；Space 休眠后链接会失效，但不影响本次会话
+      updateJob(job.id, { progress: 96, stage: '整理' });
+      var url = mp3Url;
+      var mime = 'audio/mpeg';
       genMediaCache[job.id] = { url: url, mime: mime, seconds: req.seconds, transcript: lyrics };
       updateJob(job.id, {
         status: 'done', progress: 100, stage: '',
-        result: { mime: mime, size: blob.size, seconds: req.seconds }
+        result: { mime: mime, seconds: req.seconds }
       });
       return true;
     } catch (e) {
@@ -2273,10 +2272,12 @@
       0.5, 0, 3, true, true, true, null, 0, 0, false, 0.5, null, 'none'
     ];
     var local = new AbortController();
+    var timedOut = false;
     var onAbort = function () { try { local.abort(); } catch (e) {} };
-    if (ctl) ctl.signal.addEventListener('abort', onAbort);
+    var onUserAbort = function () { onAbort(); };
+    if (ctl) ctl.signal.addEventListener('abort', onUserAbort);
     // 免费 GPU 排队可能久，给 3 分钟
-    var timer = setTimeout(onAbort, 180000);
+    var timer = setTimeout(function () { timedOut = true; onAbort(); }, 180000);
     try {
       var res = await fetch(ACE_BASE + '/gradio_api/call/__call__', {
         method: 'POST',
@@ -2304,24 +2305,13 @@
       var file = out && out[0];
       if (!file || !file.url) throw new Error('音乐模型没有返回音频');
       return file.url;
+    } catch (e) {
+      // 自家超时不算用户取消：要让上层走本地兜底
+      if (timedOut && !(ctl && ctl.signal.aborted)) throw new Error('音乐模型排队超时');
+      throw e;
     } finally {
       clearTimeout(timer);
-      if (ctl) ctl.signal.removeEventListener('abort', onAbort);
-    }
-  }
-
-  async function fetchBlob(url, ctl, timeoutMs) {
-    var local = new AbortController();
-    var onAbort = function () { try { local.abort(); } catch (e) {} };
-    if (ctl) ctl.signal.addEventListener('abort', onAbort);
-    var timer = setTimeout(onAbort, timeoutMs || 60000);
-    try {
-      var res = await fetch(url, { signal: local.signal });
-      if (!res.ok) throw new Error('音频下载 HTTP ' + res.status);
-      return await res.blob();
-    } finally {
-      clearTimeout(timer);
-      if (ctl) ctl.signal.removeEventListener('abort', onAbort);
+      if (ctl) ctl.signal.removeEventListener('abort', onUserAbort);
     }
   }
 
