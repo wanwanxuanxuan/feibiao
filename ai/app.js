@@ -987,6 +987,13 @@
     status.textContent = genStatusText(job);
     host.appendChild(status);
 
+    if (job.note) {
+      var note = document.createElement('div');
+      note.className = 'gen-transcript';
+      note.textContent = job.note;
+      host.appendChild(note);
+    }
+
     var media = genMediaCache[job.id];
     var expired = job.status === 'done' && !media;
 
@@ -2209,8 +2216,12 @@
     } catch (e) {
       clearInterval(ticker);
       if (e && e.name === 'AbortError') throw e;
-      // 线上模型不通（Space 休眠 / 排队超时）：退回本地合成
-      updateJob(job.id, { progress: 30, stage: '线上模型不可用，改用本地合成' });
+      // 线上模型不通（Space 休眠 / 排队超时）：退回本地合成，并把原因留在卡片上
+      updateJob(job.id, {
+        progress: 30,
+        stage: '线上模型不可用，改用本地合成',
+        note: '线上模型没接上（' + ((e && e.message) ? e.message : String(e)) + '），这次用本地合成兜底，没有演唱歌词。'
+      });
       return await runLocalMusic(job, ctl);
     } finally {
       clearInterval(ticker);
