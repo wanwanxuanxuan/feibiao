@@ -1334,15 +1334,8 @@
   // 也支持 <route to="image">提示词</route>
   function takeRoute(raw) {
     var route = null;
-    var text = String(raw || '').replace(/<route\b([^>]*)>([\s\S]*?)<\/route>/gi, function (m, attrs, body) {
-      if (route) return '';
-      var to = (getAttr(attrs, 'to') || '').toLowerCase();
-      var prompt = getAttr(attrs, 'prompt') || String(body || '').trim();
-      if (GEN[to] && prompt) route = { who: to, prompt: prompt.slice(0, 400) };
-      return '';
-    });
-    text = text.replace(/<route\b[^>]*>[\s\S]*$/gi, '');
-    // 自闭合写法 <route to="image" prompt="..."/>
+    var text = String(raw || '');
+    // 1) 自闭合写法 <route to="image" prompt="..."/>（必须先处理，否则会被下面的兜底规则吃掉）
     text = text.replace(/<route\b([^>]*?)\/>/gi, function (m, attrs) {
       if (route) return '';
       var to = (getAttr(attrs, 'to') || '').toLowerCase();
@@ -1350,6 +1343,16 @@
       if (GEN[to] && prompt) route = { who: to, prompt: prompt.slice(0, 400) };
       return '';
     });
+    // 2) 成对写法 <route to="...">提示词</route>
+    text = text.replace(/<route\b([^>]*)>([\s\S]*?)<\/route>/gi, function (m, attrs, body) {
+      if (route) return '';
+      var to = (getAttr(attrs, 'to') || '').toLowerCase();
+      var prompt = getAttr(attrs, 'prompt') || String(body || '').trim();
+      if (GEN[to] && prompt) route = { who: to, prompt: prompt.slice(0, 400) };
+      return '';
+    });
+    // 3) 没闭合的残留，直接删掉
+    text = text.replace(/<route\b[^>]*>[\s\S]*$/gi, '');
     return { raw: text, route: route };
   }
 
