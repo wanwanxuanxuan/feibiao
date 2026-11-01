@@ -601,6 +601,26 @@ body.hide-thinking .thinking { display: none !important; }
 .msg-doc .bubble { border-left-color: #94a3b8; }
 .att-file-icon { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 18px; background: rgba(148, 163, 184, .16); border-radius: 8px; }
 
+/* 小谷调用其它 AI 的标记 */
+.call-tags { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.call-tag {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex-wrap: wrap;
+  padding: 5px 9px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  background: rgba(139, 108, 255, .10);
+  border: 1px dashed rgba(139, 108, 255, .45);
+}
+.call-tag.call-route { background: rgba(236, 72, 153, .09); border-color: rgba(236, 72, 153, .42); }
+.call-arrow { color: var(--brand-2); font-weight: 700; }
+.call-tag b { color: var(--text); font-weight: 600; white-space: nowrap; }
+.call-body { color: var(--muted); word-break: break-word; }
+
+
 /* 生成类 AI：视频 / 音乐 / 图片 的头像 */
 .avatar-video, .avatar-music, .avatar-image {
   color: #fff;
@@ -633,7 +653,7 @@ body.hide-thinking .thinking { display: none !important; }
 }
 .gen-prompt b { font-size: 13.5px; }
 .gen-prompt span {
-  color: var(--text-soft);
+  color: var(--muted);
   font-size: 12.5px;
   word-break: break-word;
 }
@@ -652,12 +672,12 @@ body.hide-thinking .thinking { display: none !important; }
 .gen-transcript {
   margin-top: 8px;
   font-size: 12.5px;
-  color: var(--text-soft);
+  color: var(--muted);
   font-style: italic;
 }
 .gen-expired {
   font-size: 12.5px;
-  color: var(--text-soft);
+  color: var(--muted);
   margin-bottom: 8px;
 }
 .gen-actions { display: flex; gap: 8px; flex-wrap: wrap; }

@@ -789,6 +789,14 @@
     bubble.appendChild(md);
     wrap._md = md;
 
+    // 小谷调用其它 AI 的记录（追问 n12/n30/doc、派单给生成 AI），历史消息也要能看到
+    if (m.calls && m.calls.length) {
+      var callBox = document.createElement('div');
+      callBox.className = 'call-tags';
+      m.calls.forEach(function (c) { callBox.appendChild(makeCallTag(c)); });
+      bubble.appendChild(callBox);
+    }
+
     // 生成类 AI：渲染任务卡片（状态 + 媒体播放器）
     if (isGen) {
       var genHost = document.createElement('div');
@@ -849,6 +857,42 @@
     if (!isGen) renderMD(md, m.text);
     if (m.search && m.search.length) renderSearchCard(md, m.searchQuery, m.search);
     return wrap;
+  }
+
+  // 小谷调用其它 AI 的小标记：「↳ 调用 读文档 AI · doc「问题」」
+  function makeCallTag(c) {
+    var target = c.type === 'route'
+      ? (GEN[c.who] ? GEN[c.who].name : c.who)
+      : (MEDIA[c.who] ? whoLabel(c.who) : c.who);
+    var row = document.createElement('div');
+    row.className = 'call-tag ' + (c.type === 'route' ? 'call-route' : 'call-ask');
+    var arrow = document.createElement('span');
+    arrow.className = 'call-arrow';
+    arrow.textContent = '↳';
+    var label = document.createElement('b');
+    label.textContent = (c.type === 'route' ? '派单给 ' : '调用 ') + target;
+    var body = document.createElement('span');
+    body.className = 'call-body';
+    body.textContent = c.type === 'route' ? ('「' + (c.prompt || '') + '」') : ('「' + (c.q || '') + '」');
+    row.appendChild(arrow);
+    row.appendChild(label);
+    row.appendChild(body);
+    return row;
+  }
+
+  // 运行时追加到正在流式的这条消息上
+  function appendCallTag(node, call) {
+    if (!node) return;
+    var bubble = node.querySelector('.bubble');
+    if (!bubble) return;
+    var box = bubble.querySelector('.call-tags');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'call-tags';
+      bubble.appendChild(box);
+    }
+    box.appendChild(makeCallTag(call));
+    scrollBottom(true);
   }
 
   // 重新渲染某个任务对应的消息卡片（任务状态变化时调用）
@@ -2225,6 +2269,11 @@
         var askMedia = mediaForAsk(ask.who);
         if (askMedia) {
           pendingAsk = { who: ask.who, q: ask.q, media: askMedia, depth: opts.depth || 0 };
+          var callAsk = { type: 'ask', who: ask.who, q: ask.q };
+          placeholder.calls = placeholder.calls || [];
+          placeholder.calls.push(callAsk);
+          appendCallTag(node, callAsk);
+          saveMessages();
         } else {
           var lackWhat = MEDIA[ask.who].kind === 'video' ? '视频' : MEDIA[ask.who].kind === 'file' ? '文件' : '照片';
           toast(MEDIA[ask.who].name + '不在场（这轮没有' + lackWhat + '可看）');
@@ -2234,6 +2283,11 @@
       // 小谷派给生成类 AI：启动生成，完成后自动回小谷总结
       if (routeTo && (opts.routeDepth || 0) < 1) {
         pendingRoute = routeTo;
+        var callRoute = { type: 'route', who: routeTo.who, prompt: routeTo.prompt };
+        placeholder.calls = placeholder.calls || [];
+        placeholder.calls.push(callRoute);
+        appendCallTag(node, callRoute);
+        saveMessages();
       }
     } catch (err) {
       var aborted = err && (err.name === 'AbortError');
