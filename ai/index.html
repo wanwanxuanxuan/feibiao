@@ -9,7 +9,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238b6cff'/%3E%3Cstop offset='1' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='26' fill='url(%23g)'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='%23fff' font-family='sans-serif' font-weight='bold'%3E谷%3C/text%3E%3C/svg%3E" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.10.0/styles/atom-one-dark.min.css" />
-<link rel="stylesheet" href="./style.css?v=20261101t" />
+<link rel="stylesheet" href="./style.css?v=20261101u" />
 </head>
 <body>
 
@@ -250,6 +250,12 @@
       </div>
       <p class="field-note">填了以后，音乐 AI 用 <code>StepAudio 3 Music</code>：按你的曲风、情绪、人声真的唱出来，歌词直接进歌里。不填则走免 Key 的 ACE-Step（免费 GPU 配额有限，偶尔会失败）。</p>
 
+      <div class="ai-list-head">
+        <label class="field-label">AI 一览</label>
+        <p class="field-note">每个 AI 都是「1 个主引擎 + 2 个备用」。主引擎遇到额度不足、限流、地域封锁或服务出错时，会自动换成备用，你不用手动操作。这里只显示名字，不显示任何 Key。</p>
+      </div>
+      <div class="ai-list" id="aiList"></div>
+
       <label class="switch"><input id="setSound" type="checkbox" checked /><span>互动音效</span></label>
       <label class="switch"><input id="setSpeak" type="checkbox" checked /><span>实时语音时朗读小谷的回复</span></label>
       <label class="switch"><input id="setThink" type="checkbox" checked /><span>显示思考过程（默认折叠）</span></label>
@@ -273,11 +279,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.10.0/highlight.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
-<script src="./markdown.js?v=20261101t" defer></script>
-<script src="./interactions.js?v=20261101t" defer></script>
-<script src="./fx-custom.js?v=20261101t" defer></script>
-<script src="./websearch.js?v=20261101t" defer></script>
-<script src="./music.js?v=20261101t" defer></script>
-<script src="./app.js?v=20261101t" defer></script>
+<script src="./markdown.js?v=20261101u" defer></script>
+<script src="./interactions.js?v=20261101u" defer></script>
+<script src="./fx-custom.js?v=20261101u" defer></script>
+<script src="./websearch.js?v=20261101u" defer></script>
+<script src="./music.js?v=20261101u" defer></script>
+<script src="./app.js?v=20261101u" defer></script>
 </body>
 </html>

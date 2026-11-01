@@ -28,7 +28,7 @@
     },
     n30: {
       id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
-      fallback: ['nvidia/nemotron-3.5-super-vl:free'],
+      fallback: ['nvidia/nemotron-3.5-super-vl:free', 'nvidia/nemotron-nano-12b-v2-vl:free'],
       name: '看片 AI',
       short: 'n30',
       kind: 'video'
@@ -45,13 +45,14 @@
   var mediaWorking = { n12: '', n30: '', doc: '' };
 
   // 三个「生成类」AI：视频、音乐、图片。都是异步任务，要能在后台跑完。
-  // 全部走免费方案：图片用 Pollinations（免 Key，几秒出图）；视频用关键帧 + 本地合成 WebM；
+  // 全部走免费方案：图片用 Qwen-Image / FLUX.1-schnell / Pollinations 三层（额度用尽自动降级）；
+  // 视频用关键帧 + 本地合成 WebM；
   // 音乐优先用阶跃 StepAudio 3 Music（限时免费，按风格 + 歌词真唱，需要在设置里填免费 Key），
   // 没填 Key 时退回 ACE-Step（Hugging Face 免费 Space，GPU 配额有限），再不行用本地 Web Audio 合成。
   var GEN = {
     video: { name: '视频 AI', short: 'video', emoji: '🎬', engine: '本地合成 · 约 9 秒短片' },
     music: { name: '音乐 AI', short: 'music', emoji: '🎵', engine: 'StepAudio 3 · 写词演唱' },
-    image: { name: '画图 AI', short: 'image', emoji: '🖼', engine: 'Pollinations · flux' }
+    image: { name: '画图 AI', short: 'image', emoji: '🖼', engine: 'FLUX.1-schnell' }
   };
   var GEN_ALIASES = {
     video: ['video', 'seedance', '视频', 'videogen'],
@@ -59,9 +60,16 @@
     image: ['image', 'seedream', '图片', '画图', '图', '画']
   };
 
-  // 免费图像生成：Pollinations 匿名接口，按顺序试这几个快模型
-  var IMG_MODELS = ['flux', 'turbo', 'sana'];
-  // 视频关键帧（走同一个免费接口）
+  // 免费图像生成：主引擎 FLUX.1-schnell（Hugging Face Space），
+  // 额度用尽 / 排队失败 / 地域限制时自动换 FLUX.1-dev，再退到 Pollinations（免 Key）。
+  // 也就是「1 个主 + 2 个备用」，顺序写在 IMG_ENGINES 里，切换逻辑见 imgGen()。
+  var IMG_ENGINES = [
+    { key: 'flux1', name: 'FLUX.1-schnell', base: 'https://black-forest-labs-flux-1-schnell.hf.space', ep: 'infer', type: 'flux1' },
+    { key: 'fluxdev', name: 'FLUX.1-dev', base: 'https://black-forest-labs-flux-1-dev.hf.space', ep: 'infer', type: 'fluxdev' },
+    { key: 'poll', name: 'Pollinations', type: 'poll' }
+  ];
+  var IMG_MODELS = ['sana', 'turbo', 'flux'];
+  // 视频关键帧（走同一个图像链）
   var VIDEO_FRAMES = 4;
   var VIDEO_FRAME_MS = 2300;
   // 生成完成后换个主题：视频 → 赛博，音频 → 极光，照片 → 日落
@@ -1045,6 +1053,12 @@
         im.style.maxWidth = '100%';
         im.style.borderRadius = '10px';
         player.appendChild(im);
+        if (media.engine) {
+          var eng2 = document.createElement('div');
+          eng2.className = 'gen-engine';
+          eng2.textContent = '🖼 引擎：' + media.engine;
+          player.appendChild(eng2);
+        }
       }
       host.appendChild(player);
     } else if (expired) {
@@ -1617,7 +1631,9 @@
     runAI(text, forceFx, forceHtml, {});
   }
 
-  var RETRY_STATUS = { 429: 1, 500: 1, 502: 1, 503: 1, 504: 1 };
+  // 这些状态码都算「这台机器/这个模型这会儿不行」，自动换备用：
+  // 402 额度不足、403 地域封锁/无权、404 模型下线、408/409/425 超时或忙、429 限流、5xx 服务端故障、529 过载。
+  var RETRY_STATUS = { 402: 1, 403: 1, 404: 1, 408: 1, 409: 1, 425: 1, 429: 1, 500: 1, 502: 1, 503: 1, 504: 1, 529: 1 };
 
   function modelName(id) {
     for (var i = 0; i < MODELS.length; i++) {
@@ -1741,7 +1757,10 @@
 
     var answer = '', lastErr = null, usedModel = '';
     for (var i = 0; i < chain.length; i++) {
-      if (i > 0) showTyping(node);
+      if (i > 0) {
+        showTyping(node);
+        toast(MEDIA[who].name + '换了个备用模型「' + modelName(chain[i]) + '」');
+      }
       var s = { raw: '', reasoning: '', node: node, msg: placeholder, lastPaint: 0 };
       streaming = s;
       try {
@@ -1957,7 +1976,147 @@
     }
   }
 
-  // 免费图像：Pollinations 匿名接口，免 Key，几秒出图；模型依次兜底
+  /* ---------------- 画图引擎链：FLUX.1-schnell → FLUX.1-dev → Pollinations ----------------
+     主引擎是 Hugging Face 上的 FLUX.1-schnell，额度不够 / 排队失败 / 地域封锁时，
+     自动换 FLUX.1-dev，再退到免 Key 的 Pollinations。 */
+  async function imgGen(prompt, ctl, w, h, seed, onStage) {
+    var lastErr = '';
+    for (var i = 0; i < IMG_ENGINES.length; i++) {
+      var eng = IMG_ENGINES[i];
+      if (ctl && ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
+      if (i > 0) toast('画图引擎「' + IMG_ENGINES[i - 1].name + '」没接上，已自动换「' + eng.name + '」');
+      if (onStage) onStage(eng.name);
+      try {
+        var blob = eng.type === 'poll'
+          ? await pollinationsImage(prompt, ctl, w, h, seed)
+          : await hfSpaceImage(eng, prompt, ctl, w, h, seed);
+        return { blob: blob, engine: eng.name };
+      } catch (e) {
+        if (e && e.name === 'AbortError') throw e;
+        lastErr = eng.name + '：' + ((e && e.message) || e);
+      }
+    }
+    throw new Error('画图服务暂时都不可用（' + lastErr + '）');
+  }
+
+  // Hugging Face Space（Gradio）出图：POST 建任务拿 event_id，再读 SSE 里的 complete 结果
+  function hfSpaceData(eng, prompt, w, h, seed) {
+    var sd = seed % 2147483647;
+    if (eng.type === 'fluxdev') return [prompt, sd, false, w, h, 3.5, 20];
+    return [prompt, sd, false, w, h, 4];
+  }
+
+  async function hfSpaceImage(eng, prompt, ctl, w, h, seed) {
+    var local = new AbortController();
+    var onAbort = function () { try { local.abort(); } catch (e) {} };
+    if (ctl) ctl.signal.addEventListener('abort', onAbort);
+    var timer = setTimeout(onAbort, 60000);
+    try {
+      var joinRes = await fetch(eng.base + '/gradio_api/call/' + eng.ep, {
+        method: 'POST',
+        signal: local.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: hfSpaceData(eng, prompt, w, h, seed) })
+      });
+      if (!joinRes.ok) throw new Error('HTTP ' + joinRes.status);
+      var jid = await joinRes.json();
+      var ev = jid && jid.event_id;
+      if (!ev) throw new Error('排队失败（没拿到任务号）');
+      var res = await fetch(eng.base + '/gradio_api/call/' + eng.ep + '/' + ev, { signal: local.signal });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var out = await readGradioSSE(res.body, local.signal);
+      if (!out) throw new Error('这次没有出图');
+      var blob = await gradioImageBlob(eng, out);
+      if (!blob || blob.size < 1024) throw new Error('返回的图是空的');
+      return blob;
+    } catch (e) {
+      if (ctl && ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
+      throw e;
+    } finally {
+      clearTimeout(timer);
+      if (ctl) ctl.signal.removeEventListener('abort', onAbort);
+    }
+  }
+
+  async function readGradioSSE(body, signal) {
+    if (!body) throw new Error('没有可读的数据流');
+    var reader = body.getReader();
+    var dec = new TextDecoder();
+    var buf = '', evName = '', result = null, errMsg = '';
+    try {
+      while (true) {
+        var r = await reader.read();
+        if (r.done) break;
+        buf += dec.decode(r.value, { stream: true });
+        var lines = buf.split('\n');
+        buf = lines.pop();
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].replace(/\r$/, '');
+          if (line.indexOf('event:') === 0) {
+            evName = line.slice(6).trim();
+          } else if (line.indexOf('data:') === 0) {
+            var raw = line.slice(5).trim();
+            if (evName === 'complete') {
+              try { result = JSON.parse(raw); } catch (e) {}
+            } else if (evName === 'error') {
+              errMsg = raw === 'null' ? '免费 GPU 额度不足或排队失败' : raw;
+            }
+          } else if (line === '') {
+            if (errMsg) throw new Error(errMsg);
+            if (result) return pickGradioImage(result);
+            evName = '';
+          }
+        }
+      }
+    } finally {
+      try { reader.cancel(); } catch (e) {}
+    }
+    if (errMsg) throw new Error(errMsg);
+    return pickGradioImage(result);
+  }
+
+  function pickGradioImage(arr) {
+    if (!Array.isArray(arr)) return arr;
+    for (var i = 0; i < arr.length; i++) {
+      var v = arr[i];
+      if (typeof v === 'string' && (v.indexOf('data:image') === 0 || v.indexOf('http') === 0)) return v;
+      if (typeof v === 'string' && v.length > 200) return v;
+      if (v && typeof v === 'object' && (v.url || v.path)) return v;
+    }
+    return null;
+  }
+
+  async function gradioImageBlob(eng, v) {
+    if (v && typeof v === 'object') {
+      if (v.url) {
+        try {
+          var r = await fetch(v.url);
+          if (r.ok) { var b = await r.blob(); if (b.size > 1024) return b; }
+        } catch (e) {}
+      }
+      if (v.path) {
+        try {
+          var p = String(v.path).replace(/^\/+/, '');
+          var r2 = await fetch(eng.base + '/gradio_api/file=' + p);
+          if (r2.ok) return await r2.blob();
+        } catch (e) {}
+      }
+    }
+    if (typeof v === 'string') {
+      if (v.indexOf('data:') === 0) {
+        var r3 = await fetch(v);
+        return await r3.blob();
+      }
+      if (v.indexOf('http') === 0) {
+        var r4 = await fetch(v);
+        if (r4.ok) return await r4.blob();
+      }
+      return b64ToBlob(v, 'image/png');
+    }
+    throw new Error('拿不到图片文件');
+  }
+
+  // 免费图像兜底：Pollinations 匿名接口，免 Key；模型依次兜底
   async function pollinationsImage(prompt, ctl, w, h, seed) {
     if (ctl && ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
     var lastErr = '';
@@ -2661,18 +2820,21 @@
     return new Blob([ab], { type: 'audio/wav' });
   }
 
-  // 图片：Pollinations 免费接口（免 Key），flux / turbo / sana 依次兜底
+  // 图片：Qwen-Image（主）→ FLUX.1-schnell → Pollinations，额度/限流时自动换
   async function runImageGen(job, ctl) {
     updateJob(job.id, { status: 'running', progress: 3, stage: '绘制' });
     var ticker = startTicker(job.id, 7000, 92);
     try {
       var seed = hashCode(job.prompt);
-      var blob = await pollinationsImage(job.prompt, ctl, 1024, 1024, seed);
+      var out = await imgGen(job.prompt, ctl, 1024, 1024, seed, function (name) {
+        updateJob(job.id, { stage: '绘制 · ' + name });
+      });
       clearInterval(ticker);
+      var blob = out.blob;
       var url = URL.createObjectURL(blob);
-      var mime = blob.type || 'image/jpeg';
-      genMediaCache[job.id] = { url: url, mime: mime };
-      updateJob(job.id, { status: 'done', progress: 100, stage: '', result: { mime: mime, size: blob.size } });
+      var mime = blob.type && /^image\//.test(blob.type) ? blob.type : 'image/jpeg';
+      genMediaCache[job.id] = { url: url, mime: mime, engine: out.engine };
+      updateJob(job.id, { status: 'done', progress: 100, stage: '', result: { mime: mime, size: blob.size, engine: out.engine } });
       return true;
     } finally {
       clearInterval(ticker);
@@ -2801,6 +2963,8 @@
           finished = true;
         } catch (err) {
           if (err && err.name === 'AbortError') throw err;
+          // 网络断了、被墙、CORS 失败这类没有状态码的错误，也当作可换备用的情形
+          if (err && err.retryable === undefined) err.retryable = true;
           if (!err.retryable || attempt === chain.length - 1) throw err;
         }
       }
@@ -3198,6 +3362,95 @@
     m.classList.remove('show');
     setTimeout(function () { m.hidden = true; }, 180);
   }
+  /* ---------------- 设置里的「AI 一览」 ---------------- */
+  // 只列名字，不读任何 Key：聊天 / 看图 / 看片 / 读文档 / 视频 / 音乐 / 图片，各自「主 + 备1 + 备2」
+  function aiCatalog() {
+    var list = [];
+    var chat = modelChain();
+    list.push({
+      icon: '🌾', name: '小谷 · 聊天',
+      main: modelName(chat[0]),
+      backups: [modelName(chat[1]), modelName(chat[2])],
+      note: 'OpenRouter · 免费模型'
+    });
+    ['n12', 'n30', 'doc'].forEach(function (who) {
+      var c = mediaChain(who);
+      list.push({
+        icon: who === 'n12' ? '👁' : (who === 'n30' ? '🎞' : '📄'),
+        name: MEDIA[who].name,
+        main: modelName(c[0]),
+        backups: [modelName(c[1]), modelName(c[2])],
+        note: who === 'n12' ? '只负责看照片' : (who === 'n30' ? '只负责看视频抽帧' : '只负责读文件文字')
+      });
+    });
+    list.push({
+      icon: '🎬', name: '视频 AI',
+      main: 'Pollinations · sana 关键帧',
+      backups: ['Pollinations · turbo 关键帧', '本地渐变画面 + WebM 合成'],
+      note: '关键帧取不到也会用本地兜底出片'
+    });
+    var hasStep = !!(settings.stepfunKey || '').trim();
+    list.push({
+      icon: '🎵', name: '音乐 AI',
+      main: hasStep ? '阶跃 StepAudio 3 Music' : 'ACE-Step（Hugging Face）',
+      backups: hasStep
+        ? ['ACE-Step（Hugging Face）', '本地 Web Audio 合成']
+        : ['本地 Web Audio 合成', '填 StepFun Key 后启用 StepAudio 3'],
+      note: hasStep ? '按曲风 + 歌词真唱' : '免 Key；填 StepFun Key 可换 StepAudio 3'
+    });
+    list.push({
+      icon: '🖼', name: '画图 AI',
+      main: IMG_ENGINES[0].name,
+      backups: [IMG_ENGINES[1].name, IMG_ENGINES[2].name + ' · sana/turbo'],
+      note: '额度用尽或被封时自动换下一个'
+    });
+    return list;
+  }
+
+  function renderAiList() {
+    var host = $('#aiList');
+    if (!host) return;
+    host.innerHTML = '';
+    aiCatalog().forEach(function (row) {
+      var box = document.createElement('div');
+      box.className = 'ai-row';
+
+      var head = document.createElement('div');
+      head.className = 'ai-row-head';
+      var ic = document.createElement('span');
+      ic.className = 'ai-ic';
+      ic.textContent = row.icon;
+      var nm = document.createElement('b');
+      nm.textContent = row.name;
+      head.appendChild(ic);
+      head.appendChild(nm);
+      if (row.note) {
+        var nt = document.createElement('span');
+        nt.className = 'ai-note';
+        nt.textContent = row.note;
+        head.appendChild(nt);
+      }
+      box.appendChild(head);
+
+      var chain = document.createElement('div');
+      chain.className = 'ai-chain';
+      var addChip = function (label, text, cls) {
+        var chip = document.createElement('span');
+        chip.className = 'ai-chip ' + cls;
+        var lb = document.createElement('i');
+        lb.textContent = label;
+        chip.appendChild(lb);
+        chip.appendChild(document.createTextNode(text));
+        chain.appendChild(chip);
+      };
+      addChip('主', row.main, 'main');
+      row.backups.forEach(function (b, i) { addChip('备' + (i + 1), b, 'bak'); });
+      box.appendChild(chain);
+
+      host.appendChild(box);
+    });
+  }
+
   function openSettings() {
     var keyInput = $('#setKey');
     keyInput.value = settings.key;
@@ -3210,6 +3463,7 @@
     if ($('#setFx')) $('#setFx').checked = !!settings.fx;
     if ($('#setSpeak')) $('#setSpeak').checked = !!settings.speak;
     if ($('#setTokens')) $('#setTokens').value = settings.maxTokens;
+    renderAiList();
     openModal('settingsModal');
   }
 
