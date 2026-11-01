@@ -673,7 +673,10 @@ body.hide-thinking .thinking { display: none !important; }
   margin-top: 8px;
   font-size: 12.5px;
   color: var(--muted);
-  font-style: italic;
+  white-space: pre-line;
+  line-height: 1.6;
+  max-height: 180px;
+  overflow: auto;
 }
 .gen-expired {
   font-size: 12.5px;

@@ -46,10 +46,10 @@
 
   // 三个「生成类」AI：视频、音乐、图片。都是异步任务，要能在后台跑完。
   // 全部走免费方案：图片用 Pollinations（免 Key，几秒出图）；视频用关键帧 + 本地合成 WebM；
-  // 音乐用 Web Audio 本地作曲编码 WAV。（OpenRouter 上的视频/音乐/图片模型都没有可用免费档）
+  // 音乐用 ACE-Step（Hugging Face Space，免费、能按风格写歌并演唱歌词），不通时退回本地 Web Audio 合成。
   var GEN = {
     video: { name: '视频 AI', short: 'video', emoji: '🎬', engine: '本地合成 · 约 9 秒短片' },
-    music: { name: '音乐 AI', short: 'music', emoji: '🎵', engine: '本地合成 · 原创小曲' },
+    music: { name: '音乐 AI', short: 'music', emoji: '🎵', engine: 'ACE-Step · 写词演唱' },
     image: { name: '画图 AI', short: 'image', emoji: '🖼', engine: 'Pollinations · flux' }
   };
   var GEN_ALIASES = {
@@ -275,14 +275,14 @@
       '- 用户上传任意文档后，客户端会先让 doc 读完，再把内容交给你。你可以据此继续解释、翻译、总结或改写。',
       '',
       '## 你的三个生成帮手（做视频 / 音乐 / 图片）',
-      '- 谷仓里还有三个负责「做东西」的 AI：视频 AI（做约 9 秒的短片，几张关键帧推拉镜头拼成）、音乐 AI（做十几秒的原创小曲，本地合成）、画图 AI（用免费模型 flux 出 1024×1024 的图）。',
+      '- 谷仓里还有三个负责「做东西」的 AI：视频 AI（做约 9 秒的短片，几张关键帧推拉镜头拼成）、音乐 AI（ACE-Step，按风格和人声要求写歌，能唱用户给的歌词，也能自动写词，通常 30 秒到 2 分钟）、画图 AI（用免费模型 flux 出 1024×1024 的图）。',
       '- 用户可以用 @video / @music / @image 直接点名让它们生成；这时你不用抢话，它们做完会回来找你总结。',
       '- 如果用户没有点名，但你判断他想要的是「生成一段视频 / 一首音乐 / 一张图片」，就在回复最后输出一行：',
       '  <route to="video" prompt="把用户想要的内容提炼成一句清晰的提示词"/>',
       '  （to 可选 video / music / image；prompt 里写生成提示词，不要写命令。）',
       '- 派单后，客户端会启动对应的生成 AI，生成完会自动把结果交给你，你再用一两句话回应。派单这一轮你照常回复用户就行，把 <route/> 放在最后。',
       '- 拿不准用户要哪种时，先简短问一句，不要乱派。用户只是想聊天、问问题、查资料时，不要派单。',
-      '- 它们做出来的东西比较短（视频约 9 秒、音乐十几秒、图片一张），别承诺长篇或多次生成，除非用户明确要。',
+      '- 视频大约 9 秒、图片一张、音乐 30 秒到 2 分钟。用户要「带歌词的歌」时，让他把歌词写进需求里（格式：风格要求 + 歌词：…），音乐 AI 会照着唱；没给歌词时它会自动写。别承诺一次生成多首。',
       '',
       '## 回复要求',
       '1. 用中文回答，口语化，简洁但有信息量；可以少量用 emoji，不要每句都堆。',
@@ -390,7 +390,7 @@
     if (who === 'n30') return '看片 AI · n30';
     if (who === 'doc') return '读文档 AI · doc';
     if (who === 'video') return '视频 AI · 免费合成';
-    if (who === 'music') return '音乐 AI · 免费合成';
+    if (who === 'music') return '音乐 AI · ACE-Step';
     if (who === 'image') return '画图 AI · flux';
     return '小谷';
   }
@@ -1019,7 +1019,7 @@
         if (media.transcript) {
           var tr = document.createElement('div');
           tr.className = 'gen-transcript';
-          tr.textContent = '歌词：' + media.transcript;
+          tr.textContent = '🎤 歌词\n' + media.transcript;
           player.appendChild(tr);
         }
       } else {
@@ -1889,7 +1889,7 @@
     var media = genMediaCache[job.id] || {};
     var desc = def.name + '刚刚完成了一次生成。';
     if (job.who === 'video') desc += '内容是一段约 9 秒的短片，提示词是：' + job.prompt;
-    else if (job.who === 'music') desc += '内容是一段原创音乐' + (media.seconds ? '（约 ' + media.seconds + ' 秒）' : '') + '，提示词是：' + job.prompt;
+    else if (job.who === 'music') desc += '内容是一首完整的歌曲' + (media.seconds ? '（约 ' + media.seconds + ' 秒，带人声演唱）' : '') + '，用户的要求是：' + job.prompt + (media.transcript ? '；唱的词：' + media.transcript : '');
     else desc += '内容是一张图片，提示词是：' + job.prompt;
     var note = [
       '## 你的同伴刚刚生成了东西',
@@ -2140,10 +2140,194 @@
     };
   }
 
-  // 音乐：免费音乐模型都被地域封锁，改成浏览器本地作曲（Web Audio）+ WAV 导出。
-  // 提示词只用来生成随机种子：和弦走向、音色、鼓点都不一样。
+  // 音乐：走 ACE-Step（Hugging Face Space 上的免费 Gradio 接口）。
+  // 它能按风格提示词生成完整歌曲，也能把用户给的歌词唱出来；没给歌词就先让文字模型写。
+  // 接口不通时退回本地合成（Web Audio + WAV），至少不会空手而归。
+  var ACE_BASE = 'https://ace-step-ace-step.hf.space';
+  var ACE_DEFAULT_SECONDS = 60;
+
+  // 解析需求：风格、歌词、时长。格式示例：「轻快的吉他曲，90 秒，歌词：……」
+  function parseMusicRequest(text) {
+    var s = String(text || '').trim();
+    var out = { style: s, lyrics: '', seconds: ACE_DEFAULT_SECONDS, instrumental: false };
+    if (/纯音乐|不要歌词|无人声|仅伴奏|只伴奏|instrumental/i.test(s)) out.instrumental = true;
+
+    var dm = s.match(/(\d{1,3})\s*(?:秒|seconds?|s\b)/i);
+    if (dm) {
+      var sec = parseInt(dm[1], 10);
+      if (sec >= 15) out.seconds = Math.min(120, sec);
+    }
+
+    var mk = s.match(/(?:歌词|词|lyrics)\s*[：:]/i);
+    if (mk) {
+      out.lyrics = s.slice(mk.index + mk[0].length).trim();
+      s = s.slice(0, mk.index);
+    }
+    out.style = s
+      .replace(/\d{1,3}\s*(?:秒|seconds?|s\b)/i, '')
+      .replace(/(?:风格|曲风|style)\s*[：:]/i, '')
+      .replace(/[，,。.、；;\s]+$/g, '')
+      .trim();
+    if (!out.style) out.style = 'pop, melodic, warm';
+    return out;
+  }
+
   async function runMusicGen(job, ctl) {
-    updateJob(job.id, { status: 'running', progress: 4, stage: '作曲' });
+    var req = parseMusicRequest(job.prompt);
+    updateJob(job.id, { status: 'running', progress: 3, stage: '读需求' });
+    var ticker = null;
+    try {
+      var lyrics = req.lyrics;
+      if (!lyrics) {
+        if (req.instrumental) {
+          lyrics = '[verse]\n(humming softly)';
+        } else {
+          updateJob(job.id, { progress: 6, stage: '写歌词' });
+          lyrics = await writeLyricsByAI(req.style, ctl);
+        }
+      }
+      if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
+
+      updateJob(job.id, { progress: 14, stage: '提交任务' });
+      ticker = startTicker(job.id, 45000, 86);
+      var mp3Url = await aceStepGenerate(req.style, lyrics, req.seconds, ctl, function (stage) {
+        updateJob(job.id, { stage: stage });
+      });
+      clearInterval(ticker);
+
+      if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
+      updateJob(job.id, { progress: 92, stage: '下载' });
+      var blob = await fetchBlob(mp3Url, ctl, 60000);
+      if (!blob || blob.size < 2048) throw new Error('音乐文件为空');
+      var url = URL.createObjectURL(blob);
+      var mime = blob.type || 'audio/mpeg';
+      genMediaCache[job.id] = { url: url, mime: mime, seconds: req.seconds, transcript: lyrics };
+      updateJob(job.id, {
+        status: 'done', progress: 100, stage: '',
+        result: { mime: mime, size: blob.size, seconds: req.seconds }
+      });
+      return true;
+    } catch (e) {
+      clearInterval(ticker);
+      if (e && e.name === 'AbortError') throw e;
+      // 线上模型不通（Space 休眠 / 排队超时）：退回本地合成
+      updateJob(job.id, { progress: 30, stage: '线上模型不可用，改用本地合成' });
+      return await runLocalMusic(job, ctl);
+    } finally {
+      clearInterval(ticker);
+    }
+  }
+
+  // 用户没写歌词时，先让文字模型按需求写一段
+  async function writeLyricsByAI(style, ctl) {
+    var sys = [
+      '你是歌曲的词作者。根据用户给的题材和风格写一段歌词，直接输出歌词正文，不要任何解释。',
+      '要求：',
+      '1) 用 [verse] / [chorus] 段落标记，2 到 3 段，总共 8 到 16 行；',
+      '2) 用中文写（除非题材明显要求英文）；',
+      '3) 每行短、能唱、大致押韵；',
+      '4) 不要写标题、不要编号、不要 Markdown、不要引号包住整段。'
+    ].join('\n');
+    var models = [settings.model, 'nvidia/nemotron-3-ultra-550b-a55b:free', 'nvidia/nemotron-3.5-lightning:free'];
+    var lastErr = '';
+    for (var i = 0; i < models.length; i++) {
+      if (ctl && ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
+      try {
+        var res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          signal: ctl ? ctl.signal : undefined,
+          headers: {
+            'Authorization': 'Bearer ' + settings.key,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': location.origin + '/ai/',
+            'X-Title': 'Xiaogu - GuCang AI'
+          },
+          body: JSON.stringify({
+            model: models[i],
+            messages: [{ role: 'system', content: sys }, { role: 'user', content: style }],
+            temperature: 0.95,
+            max_tokens: 600,
+            stream: false
+          })
+        });
+        if (!res.ok) { lastErr = 'HTTP ' + res.status; continue; }
+        var json = await res.json();
+        var txt = json && json.choices && json.choices[0] && json.choices[0].message
+          ? String(json.choices[0].message.content || '') : '';
+        txt = txt.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim();
+        if (!txt) { lastErr = '模型返回空歌词'; continue; }
+        if (!/\[|【/.test(txt)) txt = '[verse]\n' + txt;
+        return txt.slice(0, 2000);
+      } catch (e) {
+        if (e && e.name === 'AbortError') throw e;
+        lastErr = (e && e.message) ? e.message : String(e);
+      }
+    }
+    throw new Error('自动写词失败' + (lastErr ? '（' + lastErr + '）' : ''));
+  }
+
+  // 调 ACE-Step：先 POST 建任务，再读 SSE 拿结果
+  async function aceStepGenerate(style, lyrics, seconds, ctl, onStage) {
+    var data = [
+      seconds, style, lyrics, 16, 15, 'euler', 'apg', 10, null,
+      0.5, 0, 3, true, true, true, null, 0, 0, false, 0.5, null, 'none'
+    ];
+    var local = new AbortController();
+    var onAbort = function () { try { local.abort(); } catch (e) {} };
+    if (ctl) ctl.signal.addEventListener('abort', onAbort);
+    // 免费 GPU 排队可能久，给 3 分钟
+    var timer = setTimeout(onAbort, 180000);
+    try {
+      var res = await fetch(ACE_BASE + '/gradio_api/call/__call__', {
+        method: 'POST',
+        signal: local.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: data })
+      });
+      if (!res.ok) throw new Error('音乐模型接口 HTTP ' + res.status);
+      var j = await res.json();
+      if (!j || !j.event_id) throw new Error('音乐模型没有返回任务号');
+      if (onStage) onStage('排队中');
+
+      var res2 = await fetch(ACE_BASE + '/gradio_api/call/__call__/' + j.event_id, { signal: local.signal });
+      if (!res2.ok) throw new Error('音乐模型结果读取失败 HTTP ' + res2.status);
+      var raw = await res2.text();
+      if (/event:\s*error/.test(raw)) throw new Error('音乐模型生成失败');
+      var payload = '';
+      var lines = raw.split('\n');
+      for (var i = 0; i < lines.length; i++) {
+        var ln = lines[i];
+        if (/^data:\s*/.test(ln)) payload = ln.replace(/^data:\s*/, '').trim();
+      }
+      if (!payload) throw new Error('音乐模型没有返回结果');
+      var out = JSON.parse(payload);
+      var file = out && out[0];
+      if (!file || !file.url) throw new Error('音乐模型没有返回音频');
+      return file.url;
+    } finally {
+      clearTimeout(timer);
+      if (ctl) ctl.signal.removeEventListener('abort', onAbort);
+    }
+  }
+
+  async function fetchBlob(url, ctl, timeoutMs) {
+    var local = new AbortController();
+    var onAbort = function () { try { local.abort(); } catch (e) {} };
+    if (ctl) ctl.signal.addEventListener('abort', onAbort);
+    var timer = setTimeout(onAbort, timeoutMs || 60000);
+    try {
+      var res = await fetch(url, { signal: local.signal });
+      if (!res.ok) throw new Error('音频下载 HTTP ' + res.status);
+      return await res.blob();
+    } finally {
+      clearTimeout(timer);
+      if (ctl) ctl.signal.removeEventListener('abort', onAbort);
+    }
+  }
+
+  // 兜底：本地作曲（Web Audio）+ WAV 导出。提示词只作为随机种子。
+  async function runLocalMusic(job, ctl) {
+    updateJob(job.id, { status: 'running', progress: 40, stage: '本地作曲' });
     if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
 
     var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
@@ -2155,15 +2339,14 @@
     var ctx = new OAC(2, Math.ceil(seconds * sampleRate), sampleRate);
     buildSong(ctx, plan);
 
-    updateJob(job.id, { progress: 12, stage: '混音' });
-    // 时间估算打底，渲染每到一秒再上报真实进度
-    var ticker = startTicker(job.id, 4000, 78);
+    updateJob(job.id, { progress: 46, stage: '混音' });
+    var ticker = startTicker(job.id, 4000, 88);
     try {
       for (var s = 1; s < Math.ceil(seconds); s++) {
         (function (t) {
           try {
             ctx.suspend(t).then(function () {
-              updateJob(job.id, { progress: Math.max(12, Math.round(12 + (t / seconds) * 68)), stage: '混音' });
+              updateJob(job.id, { progress: Math.max(46, Math.round(46 + (t / seconds) * 40)), stage: '混音' });
               ctx.resume();
             }).catch(function () {});
           } catch (e) {}
@@ -2174,7 +2357,7 @@
       clearInterval(ticker);
       if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
 
-      updateJob(job.id, { progress: 88, stage: '导出' });
+      updateJob(job.id, { progress: 92, stage: '导出' });
       var blob = encodeWav(buffer);
       var url = URL.createObjectURL(blob);
       var secondsOut = Math.round(buffer.duration);
