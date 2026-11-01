@@ -594,9 +594,12 @@ body.hide-thinking .thinking { display: none !important; }
 }
 .avatar-n12 { background: linear-gradient(140deg, #22d3ee, #0ea5e9); }
 .avatar-n30 { background: linear-gradient(140deg, #f59e0b, #ef4444); }
-.msg-n12 .bubble, .msg-n30 .bubble { border-left: 2px solid var(--brand-3); }
+.avatar-doc { background: linear-gradient(140deg, #94a3b8, #475569); font-size: 15px; }
+.msg-n12 .bubble, .msg-n30 .bubble, .msg-doc .bubble { border-left: 2px solid var(--brand-3); }
 .msg-n12 .bubble { border-left-color: #22d3ee; }
 .msg-n30 .bubble { border-left-color: #f59e0b; }
+.msg-doc .bubble { border-left-color: #94a3b8; }
+.att-file-icon { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 18px; background: rgba(148, 163, 184, .16); border-radius: 8px; }
 
 /* 生成类 AI：视频 / 音乐 / 图片 的头像 */
 .avatar-video, .avatar-music, .avatar-image {

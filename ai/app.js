@@ -32,9 +32,17 @@
       name: '看片 AI',
       short: 'n30',
       kind: 'video'
+    },
+    // 读文档 AI：PDF / Word / PPT / 代码 / 纯文本都由它读。客户端先抽文字，再交给它。
+    doc: {
+      id: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+      fallback: ['nvidia/nemotron-3.5-lightning:free', 'nvidia/nemotron-3.5-super-vl:free'],
+      name: '读文档 AI',
+      short: 'doc',
+      kind: 'file'
     }
   };
-  var mediaWorking = { n12: '', n30: '' };
+  var mediaWorking = { n12: '', n30: '', doc: '' };
 
   // 三个「生成类」AI：视频、音乐、图片。都是异步长任务，要能在后台跑完。
   // 注：用户写的是 oogle/lyria，实际是 google/lyria。
@@ -250,11 +258,12 @@
       '- 不知道就承认："这个我真不知道，但我想知道。"可以说"记本子上了"。',
       '- 一次最多问 1 个问题，要具体、对方答得上来；不要每句都反问。',
       '',
-      '## 你的两个帮手（只负责看，不闲聊）',
-      '- 谷仓里还住着两个只负责「看」的 AI：n12 看图（用户上传的照片），n30 看片（用户上传的视频）。',
-      '- 对话记录里以「[看图 AI 描述]」「[看片 AI 描述]」开头的段落，就是它们看到的内容。你可以直接当成你看到的事实来用，不要否认，也不要整段复述。',
-      '- 你需要更多细节时，可以在回复最后写 <ask who="n12">问题</ask> 或 <ask who="n30">问题</ask>，客户端会去问它们，再把答案交回给你继续回答。一次最多问 1 个，只在真的需要时用。',
-      '- 用户也可以用 @n12 / @n30 / @g 直接点名让谁回答；被点名的是它们，你不用抢话。',
+      '## 你的三个帮手（只负责看，不闲聊）',
+      '- 谷仓里还住着三个只负责「看」的 AI：n12 看图（用户上传的照片），n30 看片（用户上传的视频），doc 读文档（PDF / Word / PPT / 代码 / 纯文本等文件）。',
+      '- 对话记录里以「[看图 AI 描述]」「[看片 AI 描述]」「[读文档 AI 描述]」开头的段落，就是它们看到/读到的内容。你可以直接当成你看到的事实来用，不要否认，也不要整段复述。',
+      '- 你需要更多细节时，可以在回复最后写 <ask who="n12">问题</ask> / <ask who="n30">问题</ask> / <ask who="doc">问题</ask>，客户端会去问它们，再把答案交回给你继续回答。一次最多问 1 个，只在真的需要时用。',
+      '- 用户也可以用 @n12 / @n30 / @doc / @g 直接点名让谁回答；被点名的是它们，你不用抢话。',
+      '- 用户上传任意文档后，客户端会先让 doc 读完，再把内容交给你。你可以据此继续解释、翻译、总结或改写。',
       '',
       '## 你的三个生成帮手（做视频 / 音乐 / 图片）',
       '- 谷仓里还有三个负责「做东西」的 AI：视频 AI（seedance，做短视频）、音乐 AI（lyria，做音乐）、画图 AI（seedream，画图片）。',
@@ -348,6 +357,9 @@
     } else if (kind === 'n30') {
       a.textContent = '影';
       a.title = '看片 AI · n30';
+    } else if (kind === 'doc') {
+      a.textContent = '📄';
+      a.title = '读文档 AI · doc';
     } else if (kind === 'video') {
       a.textContent = '🎬';
       a.title = '视频 AI · seedance';
@@ -366,6 +378,7 @@
   function whoLabel(who) {
     if (who === 'n12') return '看图 AI · n12';
     if (who === 'n30') return '看片 AI · n30';
+    if (who === 'doc') return '读文档 AI · doc';
     if (who === 'video') return '视频 AI · seedance';
     if (who === 'music') return '音乐 AI · lyria';
     if (who === 'image') return '画图 AI · seedream';
@@ -402,7 +415,7 @@
     var cap = document.createElement('div');
     cap.className = 'att-cap';
     var b = document.createElement('b');
-    b.textContent = att.kind === 'video' ? '🎬 视频' : '📷 照片';
+    b.textContent = att.kind === 'video' ? '🎬 视频' : att.kind === 'file' ? '📄 文件' : '📷 照片';
     var s = document.createElement('span');
     s.textContent = att.name || '';
     cap.appendChild(b);
@@ -524,18 +537,157 @@
     });
   }
 
+  // 可以直接按文本读的扩展名
+  var TEXT_EXTS = ['txt', 'text', 'md', 'markdown', 'json', 'jsonl', 'csv', 'tsv', 'log', 'ini', 'cfg', 'conf', 'yml', 'yaml', 'xml', 'html', 'htm', 'css', 'scss', 'js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs', 'py', 'ipynb', 'rb', 'go', 'java', 'kt', 'c', 'h', 'cpp', 'hpp', 'cs', 'rs', 'php', 'pl', 'lua', 'swift', 'sh', 'bash', 'zsh', 'bat', 'cmd', 'ps1', 'sql', 'toml', 'env', 'gitignore', 'dockerfile', 'makefile', 'r', 'm', 'asm', 'vbs', 'ahk'];
+  var OLD_OFFICE = ['doc', 'ppt', 'xls', 'wps', 'et', 'dps'];
+
+  // 中文文件常见 GBK 编码：先按 UTF-8 解，出现乱码就换 GBK
+  function decodeBytes(buf) {
+    var text = '';
+    try { text = new TextDecoder('utf-8', { fatal: false }).decode(buf); } catch (e) { text = ''; }
+    if (text.indexOf('\uFFFD') === -1) return text;
+    try { return new TextDecoder('gbk', { fatal: false }).decode(buf); } catch (e) { return text; }
+  }
+
+  function decodeEntities(s) {
+    return String(s || '')
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+      .replace(/&apos;/g, "'").replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&');
+  }
+
+  // Word / PPT 的 XML 里，段落结束就是换行，去掉标签后就是正文
+  function xmlToText(xml) {
+    var s = String(xml || '')
+      .replace(/<w:tab[^>]*\/>/g, '\t')
+      .replace(/<w:br[^>]*\/>/g, '\n')
+      .replace(/<a:br[^>]*\/>/g, '\n')
+      .replace(/<\/w:p>/g, '\n')
+      .replace(/<\/a:p>/g, '\n')
+      .replace(/<[^>]+>/g, '');
+    return decodeEntities(s);
+  }
+
+  async function ensurePdfLib() {
+    if (!window.pdfjsLib) throw new Error('PDF 解析库没加载好，刷新页面再试');
+    if (!window.__pdfWorkerBlob) {
+      var wr = await fetch('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js');
+      if (!wr.ok) throw new Error('PDF 解析器加载失败');
+      window.__pdfWorkerBlob = URL.createObjectURL(new Blob([await wr.text()], { type: 'application/javascript' }));
+    }
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = window.__pdfWorkerBlob;
+    return window.pdfjsLib;
+  }
+
+  async function extractPdf(file) {
+    var lib = await ensurePdfLib();
+    var buf = await file.arrayBuffer();
+    var pdf = await lib.getDocument({ data: buf }).promise;
+    var out = [], total = 0, maxPages = Math.min(pdf.numPages, 60);
+    for (var p = 1; p <= maxPages; p++) {
+      var page = await pdf.getPage(p);
+      var tc = await page.getTextContent();
+      var line = tc.items.map(function (it) { return it.str || ''; }).join(' ').replace(/\s+/g, ' ').trim();
+      out.push('【第 ' + p + ' 页】\n' + line);
+      total += line.length;
+      if (total > 60000) {
+        out.push('……（共 ' + pdf.numPages + ' 页，后面已省略）');
+        break;
+      }
+    }
+    return out.join('\n\n');
+  }
+
+  async function extractDocx(file) {
+    if (!window.JSZip) throw new Error('文档解析库没加载好，刷新页面再试');
+    var zip = await window.JSZip.loadAsync(file);
+    var entry = zip.file('word/document.xml');
+    if (!entry) throw new Error('这个 docx 里没找到正文');
+    return xmlToText(await entry.async('string'));
+  }
+
+  async function extractPptx(file) {
+    if (!window.JSZip) throw new Error('文档解析库没加载好，刷新页面再试');
+    var zip = await window.JSZip.loadAsync(file);
+    var slides = [];
+    zip.forEach(function (path) {
+      var m = path.match(/^ppt\/slides\/slide(\d+)\.xml$/);
+      if (m) slides.push({ n: parseInt(m[1], 10), path: path });
+    });
+    if (!slides.length) throw new Error('这个 pptx 里没找到幻灯片');
+    slides.sort(function (a, b) { return a.n - b.n; });
+    var out = [], total = 0;
+    for (var i = 0; i < slides.length; i++) {
+      var xml = await zip.file(slides[i].path).async('string');
+      var body = '';
+      xml.replace(/<a:t>([\s\S]*?)<\/a:t>/g, function (m, s) { body += decodeEntities(s) + '\n'; return m; });
+      body = body.trim();
+      if (!body) continue;
+      out.push('【第 ' + slides[i].n + ' 页】\n' + body);
+      total += body.length;
+      if (total > 60000) {
+        out.push('……（共 ' + slides.length + ' 页，后面已省略）');
+        break;
+      }
+    }
+    return out.join('\n\n');
+  }
+
+  async function prepareFile(file) {
+    if (file.size > 60 * 1024 * 1024) throw new Error('文件太大了（上限 60MB）');
+    var ext = (String(file.name).split('.').pop() || '').toLowerCase();
+    var text = '';
+    if (ext === 'pdf') {
+      toast('正在解析 PDF…');
+      text = await extractPdf(file);
+    } else if (ext === 'docx') {
+      toast('正在解析 Word…');
+      text = await extractDocx(file);
+    } else if (ext === 'pptx') {
+      toast('正在解析 PPT…');
+      text = await extractPptx(file);
+    } else if (OLD_OFFICE.indexOf(ext) > -1) {
+      throw new Error('旧版 .' + ext + ' 读不了，另存为 .docx / .pptx 再传');
+    } else if (TEXT_EXTS.indexOf(ext) > -1 || /^text\//.test(file.type) || !file.type) {
+      text = decodeBytes(await file.arrayBuffer());
+    } else {
+      throw new Error('暂不支持 .' + (ext || '未知') + ' 这种格式');
+    }
+
+    text = String(text || '').replace(/\r\n/g, '\n').replace(/[\t ]+\n/g, '\n').replace(/\n{4,}/g, '\n\n\n').trim();
+    if (!text) throw new Error('这个文件里没抽到文字（可能是扫描版或纯图片）');
+
+    // 免费模型上下文有限，超长文件先截断（保留开头，够模型判断和回答）
+    var full = text.length;
+    var truncated = false;
+    if (text.length > 30000) { text = text.slice(0, 30000); truncated = true; }
+
+    return {
+      kind: 'file',
+      name: file.name || '文件',
+      size: file.size,
+      ext: ext,
+      text: text,
+      fullChars: full,
+      truncated: truncated,
+      chars: text.length
+    };
+  }
+
   async function handleUpload(file) {
     if (!file) return;
     if (busy) { toast('等这一轮说完再传附件'); return; }
-    var kind = /^video\//.test(file.type) ? 'video' : /^image\//.test(file.type) ? 'image' : '';
-    if (!kind) { toast('只支持照片和视频'); return; }
-    toast(kind === 'video' ? '正在从视频里抽画面…' : '正在处理照片…');
+    var kind = /^video\//.test(file.type) ? 'video' : /^image\//.test(file.type) ? 'image' : 'file';
+    toast(kind === 'video' ? '正在从视频里抽画面…' : kind === 'image' ? '正在处理照片…' : '正在读文件…');
     try {
-      var a = kind === 'video' ? await prepareVideo(file) : await prepareImage(file);
+      var a = kind === 'video' ? await prepareVideo(file) : kind === 'image' ? await prepareImage(file) : await prepareFile(file);
       attach = a;
-      lastMedia = { kind: a.kind, name: a.name, media: a.media };
+      lastMedia = { kind: a.kind, name: a.name, media: a.media || [], text: a.text || '', ext: a.ext || '' };
       renderAttachUI();
-      toast(kind === 'video' ? '视频已就绪（' + a.media.length + ' 帧）' : '照片已就绪');
+      toast(kind === 'video' ? '视频已就绪（' + a.media.length + ' 帧）'
+        : kind === 'image' ? '照片已就绪'
+        : '文件已就绪（' + a.chars + ' 字' + (a.truncated ? '，已截断' : '') + '）');
     } catch (e) {
       toast((e && e.message) || '附件处理失败');
     }
@@ -553,12 +705,20 @@
       img.src = attach.thumb;
       img.alt = attach.name || '';
       th.appendChild(img);
+    } else if (attach.kind === 'file') {
+      var icon = document.createElement('div');
+      icon.className = 'att-file-icon';
+      icon.textContent = '📄';
+      th.appendChild(icon);
     }
     $('#attachName').textContent = attach.name || '附件';
     var mb = attach.size ? (attach.size / 1024 / 1024).toFixed(1) + 'MB' : '';
-    var sizeText = attach.kind === 'video' ? '视频 · ' + attach.media.length + ' 帧' : '照片';
-    $('#attachMeta').textContent = sizeText + (mb ? ' · ' + mb : '') +
-      ' · 先交给' + (attach.kind === 'video' ? '看片 AI n30' : '看图 AI n12');
+    var sizeText;
+    if (attach.kind === 'video') sizeText = '视频 · ' + attach.media.length + ' 帧';
+    else if (attach.kind === 'file') sizeText = '文件 · ' + attach.chars + ' 字' + (attach.truncated ? '（已截断）' : '');
+    else sizeText = '照片';
+    var reader = attach.kind === 'video' ? '看片 AI n30' : attach.kind === 'file' ? '读文档 AI doc' : '看图 AI n12';
+    $('#attachMeta').textContent = sizeText + (mb ? ' · ' + mb : '') + ' · 先交给' + reader;
   }
 
   function renderSearchCard(host, query, results) {
@@ -588,7 +748,7 @@
   function buildMessageNode(m) {
     var isGen = !!(m.gen && m.gen.jobId);
     var who;
-    if (m.who === 'n12' || m.who === 'n30' || m.who === 'video' || m.who === 'music' || m.who === 'image') who = m.who;
+    if (m.who === 'n12' || m.who === 'n30' || m.who === 'doc' || m.who === 'video' || m.who === 'music' || m.who === 'image') who = m.who;
     else who = 'ai';
     var wrap = document.createElement('div');
     wrap.className = 'msg ' + (m.role === 'ai' ? ('msg-ai' + (who !== 'ai' ? ' msg-' + who : '')) : 'msg-user');
@@ -1116,7 +1276,7 @@
     var list = [];
     var text = String(raw || '').replace(/<ask\b([^>]*)>([\s\S]*?)<\/ask>/gi, function (m, attrs, body) {
       var who = (getAttr(attrs, 'who') || getAttr(attrs, 'to') || 'n12').toLowerCase();
-      if (who !== 'n12' && who !== 'n30') who = 'n12';
+      if (who !== 'n12' && who !== 'n30' && who !== 'doc') who = 'n12';
       if (list.length < 1 && String(body || '').trim()) {
         list.push({ who: who, q: String(body || '').trim().slice(0, 300) });
       }
@@ -1191,8 +1351,9 @@
       return (m.text || m.att || m.gen) && !m.pending;
     }).slice(-(limit || 12)).forEach(function (m) {
       if (m.role === 'user') {
-        lines.push('用户：' + (m.text || '（只上传了' + (m.att && m.att.kind === 'video' ? '视频' : '照片') + '）') +
-          (m.att && m.text ? '（同时上传了' + (m.att.kind === 'video' ? '视频' : '照片') + '）' : ''));
+        var attName = m.att ? (m.att.kind === 'video' ? '视频' : m.att.kind === 'file' ? '文件' : '照片') : '';
+        lines.push('用户：' + (m.text || '（只上传了' + attName + '）') +
+          (m.att && m.text ? '（同时上传了' + attName + '）' : ''));
       } else if (m.gen) {
         var j = findJob(m.gen.jobId);
         lines.push(whoLabel(m.who) + '：' + genSummaryText(j));
@@ -1216,14 +1377,15 @@
       return (m.text || m.att || m.gen) && !m.pending;
     }).slice(-12).map(function (m) {
       if (m.role === 'user') {
-        var head = m.att ? ('[用户上传了' + (m.att.kind === 'video' ? '一段视频' : '一张照片') + ']' + (m.text ? '\n' : '')) : '';
+        var attName = m.att ? (m.att.kind === 'video' ? '一段视频' : m.att.kind === 'file' ? '一个文件' : '一张照片') : '';
+        var head = m.att ? ('[用户上传了' + attName + ']' + (m.text ? '\n' : '')) : '';
         return { role: 'user', content: head + (m.text || '') };
       }
       if (m.gen) {
         var j = findJob(m.gen.jobId);
         return { role: 'assistant', content: genSummaryText(j) };
       }
-      var tag = m.who === 'n12' ? '[看图 AI 描述] ' : m.who === 'n30' ? '[看片 AI 描述] ' : '';
+      var tag = m.who === 'n12' ? '[看图 AI 描述] ' : m.who === 'n30' ? '[看片 AI 描述] ' : m.who === 'doc' ? '[读文档 AI 描述] ' : '';
       return { role: 'assistant', content: tag + (m.text || '') };
     });
   }
@@ -1266,9 +1428,9 @@
     }
     // @video / @music / @image（含别名）：点名生成类 AI
     var genRoute = parseGenWho(text);
-    // @n12 / @n30 / @g：点名让谁回答
+    // @n12 / @n30 / @doc / @g：点名让谁回答
     var who = 'g';
-    var route = text.match(/^[@＠](n12|n30|g)(?=$|[^\w])/i);
+    var route = text.match(/^[@＠](n12|n30|doc|g)(?=$|[^\w])/i);
     if (route) {
       who = route[1].toLowerCase();
       text = text.slice(route[0].length).replace(/^[，,。.、:：\s]+/, '').trim();
@@ -1290,9 +1452,11 @@
       kind: attach.kind,
       name: attach.name,
       thumb: attach.thumb,
-      media: attach.media.slice()
+      media: (attach.media || []).slice(),
+      text: attach.text || '',
+      ext: attach.ext || ''
     } : null;
-    if (media) lastMedia = { kind: media.kind, name: media.name, media: media.media };
+    if (media) lastMedia = { kind: media.kind, name: media.name, media: media.media, text: media.text, ext: media.ext };
     var attMeta = media ? { kind: media.kind, name: media.name, thumb: media.thumb } : null;
 
     elInput.value = '';
@@ -1307,13 +1471,14 @@
       return;
     }
 
-    // 点名 n12 / n30：只让它们回答（上下文仍然共享）
-    if (who === 'n12' || who === 'n30') {
+    // 点名 n12 / n30 / doc：只让它们回答（上下文仍然共享）
+    if (who === 'n12' || who === 'n30' || who === 'doc') {
       var picked = null;
       if (media && media.kind === MEDIA[who].kind) picked = media;
       else if (lastMedia && lastMedia.kind === MEDIA[who].kind) picked = lastMedia;
       if (!picked) {
-        toast('先上传' + (MEDIA[who].kind === 'video' ? '一段视频' : '一张照片') + '，' + MEDIA[who].name + '才有东西看');
+        var needName = MEDIA[who].kind === 'video' ? '一段视频' : MEDIA[who].kind === 'file' ? '一个文件' : '一张照片';
+        toast('先上传' + needName + '，' + MEDIA[who].name + '才有东西看');
         runAI(text || '你好', false, false, {});
         return;
       }
@@ -1321,9 +1486,10 @@
       return;
     }
 
-    // 默认：有附件时先让看图/看片 AI 描述，再交给小谷
+    // 默认：有附件时先让看图 / 看片 / 读文档 AI 处理，再交给小谷
     if (media) {
-      runMedia(media.kind === 'video' ? 'n30' : 'n12', text, media, { thenG: true });
+      var reader = media.kind === 'video' ? 'n30' : media.kind === 'file' ? 'doc' : 'n12';
+      runMedia(reader, text, media, { thenG: true });
       return;
     }
 
@@ -1358,6 +1524,19 @@
   }
 
   function mediaSystem(who) {
+    if (who === 'doc') {
+      return [
+        '你是「谷仓 AI」里专门读文件的助手，代号 doc。你只做一件事：把文件里的内容如实说出来。',
+        '你会收到从用户上传的文件里提取出来的文字（PDF / Word / PPT / 代码 / 纯文本）。',
+        '规则：',
+        '1. 先用一句话说清这是什么文件、大概讲什么，再回答用户关心的点。',
+        '2. 引用原文的关键句、数字、条款时保持准确，不要改写原意，不要编造文件里没有的内容。',
+        '3. 代码文件说清语言、用途、关键函数和值得注意的地方；批处理/脚本要说清它会执行什么操作、有没有风险。',
+        '4. 不闲聊、不扮演小谷、不调用互动、不输出任何标签；用短句。',
+        '5. 一般 200 字以内；对方明确要求细读或总结时才展开，可以用简单列表。',
+        '6. 提取的文字可能有断行、乱码或被截断，遇到明显残缺就说明，不要硬猜。'
+      ].join('\n');
+    }
     if (who === 'n30') {
       return [
         '你是「谷仓 AI」里专门看视频的助手，代号 n30。你只做一件事：把看到的内容如实说出来。',
@@ -1384,7 +1563,14 @@
   function mediaPrompt(who, question, kind) {
     var head = who === 'n30'
       ? '下面是从同一个视频里按时间顺序抽取的几帧画面（第 1 帧最早，最后一帧最晚）。'
-      : '下面这张照片是用户刚刚上传的。';
+      : who === 'doc'
+        ? '下面是从用户上传的文件里提取出来的文字。'
+        : '下面这张照片是用户刚刚上传的。';
+    var askText = kind === 'video'
+      ? '说说视频里发生了什么。'
+      : kind === 'file'
+        ? '根据文件内容回答。'
+        : '说说照片里有什么。';
     var history = transcriptFor(12);
     return [
       head,
@@ -1394,8 +1580,8 @@
       '',
       '## 你的任务',
       question
-        ? ('针对用户最后说的「' + question.slice(0, 160) + '」：' + (kind === 'video' ? '说说视频里发生了什么。' : '说说照片里有什么。'))
-        : ('用户没有额外说明，直接' + (kind === 'video' ? '说说视频里发生了什么。' : '说说照片里有什么。')),
+        ? ('针对用户最后说的「' + question.slice(0, 160) + '」：' + askText)
+        : ('用户没有额外说明，直接' + askText),
       '只描述你看到的内容，不要扮演小谷，不要输出标签或 Markdown 标题。'
     ].join('\n');
   }
@@ -1419,10 +1605,20 @@
     controller = new AbortController();
     var chain = mediaChain(who);
 
-    var parts = [{ type: 'text', text: mediaPrompt(who, question, media.kind) }];
-    (media.media || []).slice(0, 8).forEach(function (url) {
-      parts.push({ type: 'image_url', image_url: { url: url } });
-    });
+    var parts;
+    if (media.kind === 'file') {
+      var docHead = mediaPrompt(who, question, 'file');
+      parts = [{
+        type: 'text',
+        text: docHead + '\n\n## 文件：' + (media.name || '未命名') + (media.ext ? '（.' + media.ext + '）' : '') +
+          '\n```\n' + String(media.text || '').slice(0, 30000) + '\n```'
+      }];
+    } else {
+      parts = [{ type: 'text', text: mediaPrompt(who, question, media.kind) }];
+      (media.media || []).slice(0, 8).forEach(function (url) {
+        parts.push({ type: 'image_url', image_url: { url: url } });
+      });
+    }
 
     var answer = '', lastErr = null, usedModel = '';
     for (var i = 0; i < chain.length; i++) {
@@ -1447,7 +1643,7 @@
             ],
             stream: true,
             temperature: 0.35,
-            max_tokens: 1800,
+            max_tokens: who === 'doc' ? 3000 : 1800,
             top_p: 0.9
           })
         });
@@ -1505,9 +1701,10 @@
     setBusy(false);
 
     if (opts.thenG && finalText) {
+      var seenWhat = media.kind === 'video' ? '用户上传的视频' : media.kind === 'file' ? '用户上传的文件' : '用户上传的照片';
       var note = [
         '## 你的同伴刚刚看过内容了',
-        '「' + def.name + '」看了' + (media.kind === 'video' ? '用户上传的视频' : '用户上传的照片') + '，它看到的是：',
+        '「' + def.name + '」看了' + seenWhat + (media.kind === 'file' ? '（' + (media.name || '') + '）' : '') + '，它看到的是：',
         finalText,
         '',
         '请用你自己的话接着回应（不要复述整段描述，只挑你在意的细节，可以带上你的经历或追问）。如果你还需要更多细节，可以在回复里写 <ask who="' + who + '">问题</ask>。'
@@ -2031,7 +2228,8 @@
         if (askMedia) {
           pendingAsk = { who: ask.who, q: ask.q, media: askMedia, depth: opts.depth || 0 };
         } else {
-          toast(MEDIA[ask.who].name + '不在场（这轮没有' + (MEDIA[ask.who].kind === 'video' ? '视频' : '照片') + '可看）');
+          var lackWhat = MEDIA[ask.who].kind === 'video' ? '视频' : MEDIA[ask.who].kind === 'file' ? '文件' : '照片';
+          toast(MEDIA[ask.who].name + '不在场（这轮没有' + lackWhat + '可看）');
         }
       }
 
