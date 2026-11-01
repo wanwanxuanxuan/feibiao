@@ -1148,7 +1148,7 @@
             ],
             stream: true,
             temperature: 0.35,
-            max_tokens: 1400,
+            max_tokens: 1800,
             top_p: 0.9
           })
         });
