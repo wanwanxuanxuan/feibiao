@@ -16,6 +16,26 @@
     { id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', name: 'Nemotron 3 Nano Omni', note: '轻量 · 免费' }
   ];
 
+  // 两个「只负责看」的 AI：n12 看图，n30 看片。它们不闲聊，只把内容说出来，供小谷使用。
+  // 注：nvidia/nemotron-nano-12b-v2-vl:free 目前不在 OpenRouter 目录里，所以后面挂了备用视觉模型。
+  var MEDIA = {
+    n12: {
+      id: 'nvidia/nemotron-nano-12b-v2-vl:free',
+      fallback: ['nvidia/nemotron-3.5-super-vl:free', 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free'],
+      name: '看图 AI',
+      short: 'n12',
+      kind: 'image'
+    },
+    n30: {
+      id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+      fallback: ['nvidia/nemotron-3.5-super-vl:free'],
+      name: '看片 AI',
+      short: 'n30',
+      kind: 'video'
+    }
+  };
+  var mediaWorking = { n12: '', n30: '' };
+
   var LS_MSG = 'yg_ai_msgs_v1';
   var LS_SET = 'yg_ai_settings_v1';
 
@@ -29,6 +49,8 @@
   var streaming = null;
   var renderTimer = 0;
   var lastAutoIx = '';
+  var attach = null;      // 待发送的附件 {kind, name, size, thumb, media[]}
+  var lastMedia = null;   // 最近一次上传的媒体，@n12 / @n30 和小谷追问时复用
 
   var elMessages, elChat, elWelcome, elInput, elSend, elStop, elModelChip, elMic, elVoiceBar, elVoiceState;
 
@@ -77,7 +99,20 @@
     } catch (e) { return []; }
   }
   function saveMessages() {
-    try { localStorage.setItem(LS_MSG, JSON.stringify(messages.slice(-80))); } catch (e) {}
+    try {
+      localStorage.setItem(LS_MSG, JSON.stringify(messages.slice(-80)));
+    } catch (e) {
+      // 缩略图太多可能撑爆 localStorage：去掉缩略图再存一次
+      try {
+        var slim = messages.slice(-80).map(function (m) {
+          if (!m.att) return m;
+          var c = Object.assign({}, m);
+          c.att = { kind: m.att.kind, name: m.att.name };
+          return c;
+        });
+        localStorage.setItem(LS_MSG, JSON.stringify(slim));
+      } catch (e2) {}
+    }
   }
 
   /* ---------------- 系统提示词 ---------------- */
@@ -85,6 +120,7 @@
     opts = opts || {};
     var forceFx = !!opts.forceFx;
     var forceHtml = !!opts.forceHtml;
+    var extraNote = opts.extraNote || '';
     var order = ['emoji', 'gesture', 'screen', 'sound', 'theme', 'utility', 'text'];
     var catalog = order.map(function (cat) {
       var items = IX.list.filter(function (x) { return x.cat === cat; });
@@ -136,6 +172,12 @@
       '- 不知道就承认："这个我真不知道，但我想知道。"可以说"记本子上了"。',
       '- 一次最多问 1 个问题，要具体、对方答得上来；不要每句都反问。',
       '',
+      '## 你的两个帮手（只负责看，不闲聊）',
+      '- 谷仓里还住着两个只负责「看」的 AI：n12 看图（用户上传的照片），n30 看片（用户上传的视频）。',
+      '- 对话记录里以「[看图 AI 描述]」「[看片 AI 描述]」开头的段落，就是它们看到的内容。你可以直接当成你看到的事实来用，不要否认，也不要整段复述。',
+      '- 你需要更多细节时，可以在回复最后写 <ask who="n12">问题</ask> 或 <ask who="n30">问题</ask>，客户端会去问它们，再把答案交回给你继续回答。一次最多问 1 个，只在真的需要时用。',
+      '- 用户也可以用 @n12 / @n30 / @g 直接点名让谁回答；被点名的是它们，你不用抢话。',
+      '',
       '## 回复要求',
       '1. 用中文回答，口语化，简洁但有信息量；可以少量用 emoji，不要每句都堆。',
       '2. 每次回复都要调用 1 个互动（用户明确想要更多时可以 2-3 个），放在回复最后，独占一行：',
@@ -174,7 +216,7 @@
       '5. 拿不准就画安全的粒子或线条动画，不要用网络、DOM、死循环。',
       '6. 重要：沙箱里没有 document、window、canvas、Image、OffscreenCanvas，也没有 import/require。只能直接用给你的参数画图：ctx（2D 上下文）、W（宽）、H（高）、t（0~1 进度）、time/dt（毫秒）、rnd(seed)、palette（颜色数组）、clear()（清屏）。不要用 class、不要 import、不要模板字符串反引号以外的高级语法，避免 let/const 外的复杂结构。每帧开头调用 clear()。',
       '7. 代码要短：宁可简单能跑，也不要写一大段被截断。粒子数控制在 80 以内。'
-    ] : []).concat(searchNote ? [searchNote] : []).join('\n');
+    ] : []).concat(searchNote ? [searchNote] : []).concat(extraNote ? ['', extraNote] : []).join('\n');
   }
 
   /* ---------------- 渲染 ---------------- */
@@ -212,11 +254,45 @@
 
   function makeAvatar(kind) {
     var a = document.createElement('div');
-    a.className = 'avatar ' + (kind === 'ai' ? 'avatar-ai' : '');
-    if (kind === 'ai') {
+    a.className = 'avatar ' + (kind === 'ai' ? 'avatar-ai' : 'avatar-' + kind);
+    if (kind === 'n12') {
+      a.textContent = '图';
+      a.title = '看图 AI · n12';
+    } else if (kind === 'n30') {
+      a.textContent = '影';
+      a.title = '看片 AI · n30';
+    } else if (kind === 'ai') {
       a.innerHTML = '<span>谷</span>';
     }
     return a;
+  }
+
+  function whoLabel(who) {
+    if (who === 'n12') return '看图 AI · n12';
+    if (who === 'n30') return '看片 AI · n30';
+    return '小谷';
+  }
+
+  function renderAttCard(host, att) {
+    if (!host || !att) return;
+    var card = document.createElement('div');
+    card.className = 'att-card';
+    if (att.thumb) {
+      var img = document.createElement('img');
+      img.src = att.thumb;
+      img.alt = att.name || '附件';
+      card.appendChild(img);
+    }
+    var cap = document.createElement('div');
+    cap.className = 'att-cap';
+    var b = document.createElement('b');
+    b.textContent = att.kind === 'video' ? '🎬 视频' : '📷 照片';
+    var s = document.createElement('span');
+    s.textContent = att.name || '';
+    cap.appendChild(b);
+    if (att.name) cap.appendChild(s);
+    card.appendChild(cap);
+    host.appendChild(card);
   }
 
   // 用户明确点歌时（放一首晴天），客户端直接从原话里取歌名，比模型给的 q 更准
@@ -228,6 +304,145 @@
     var s = m[1];
     if (/^(歌|音乐|曲子|歌曲|点|些|首|支)/.test(s)) return '';
     return s;
+  }
+
+  /* ---------------- 附件：照片 / 视频 ---------------- */
+  function readAsDataURL(file) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () { resolve(String(r.result || '')); };
+      r.onerror = function () { reject(new Error('文件读不出来')); };
+      r.readAsDataURL(file);
+    });
+  }
+
+  function loadImage(url) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { reject(new Error('图片读不出来')); };
+      img.src = url;
+    });
+  }
+
+  function drawScaled(src, maxSide, quality) {
+    var w = src.videoWidth || src.naturalWidth || src.width;
+    var h = src.videoHeight || src.naturalHeight || src.height;
+    if (!w || !h) throw new Error('尺寸异常');
+    var k = Math.min(1, maxSide / Math.max(w, h));
+    var cw = Math.round(w * k), ch = Math.round(h * k);
+    var c = document.createElement('canvas');
+    c.width = cw;
+    c.height = ch;
+    var ctx = c.getContext('2d');
+    if (!ctx) throw new Error('浏览器不支持图片处理');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.drawImage(src, 0, 0, cw, ch);
+    return c.toDataURL('image/jpeg', quality);
+  }
+
+  async function prepareImage(file) {
+    if (file.size > 20 * 1024 * 1024) throw new Error('照片太大了（上限 20MB）');
+    var raw = await readAsDataURL(file);
+    var img = await loadImage(raw);
+    return {
+      kind: 'image',
+      name: file.name || '照片',
+      size: file.size,
+      thumb: drawScaled(img, 220, 0.6),
+      media: [drawScaled(img, 1280, 0.82)]
+    };
+  }
+
+  function prepareVideo(file) {
+    return new Promise(function (resolve, reject) {
+      if (file.size > 80 * 1024 * 1024) { reject(new Error('视频太大了（上限 80MB）')); return; }
+      var url = URL.createObjectURL(file);
+      var v = document.createElement('video');
+      var done = false;
+      v.preload = 'auto';
+      v.muted = true;
+      v.playsInline = true;
+      v.src = url;
+      function finish() {
+        done = true;
+        try { URL.revokeObjectURL(url); } catch (e) {}
+      }
+      function fail(msg) {
+        if (done) return;
+        finish();
+        reject(new Error(msg));
+      }
+      var guard = setTimeout(function () { fail('视频处理超时，换个小一点的视频试试'); }, 25000);
+      v.onerror = function () { clearTimeout(guard); fail('这个视频浏览器读不了，换个格式试试'); };
+      v.onloadedmetadata = function () {
+        var dur = isFinite(v.duration) && v.duration > 0 ? v.duration : 0;
+        if (!dur) { clearTimeout(guard); fail('读不出视频时长'); return; }
+        var times = [0.06, 0.32, 0.58, 0.84].map(function (p) {
+          return Math.min(Math.max(0, dur - 0.06), dur * p);
+        });
+        var i = 0, frames = [], thumb = '';
+        function shot() {
+          if (done) return;
+          if (i >= times.length) {
+            clearTimeout(guard);
+            finish();
+            if (!frames.length) { reject(new Error('没能从视频里抽到画面')); return; }
+            resolve({ kind: 'video', name: file.name || '视频', size: file.size, thumb: thumb, media: frames, duration: dur });
+            return;
+          }
+          var t = times[i++];
+          v.onseeked = function () {
+            try {
+              var jpg = drawScaled(v, 720, 0.75);
+              if (!thumb) thumb = drawScaled(v, 220, 0.6);
+              frames.push(jpg);
+            } catch (e) {}
+            shot();
+          };
+          try { v.currentTime = t; } catch (e) { shot(); }
+        }
+        shot();
+      };
+    });
+  }
+
+  async function handleUpload(file) {
+    if (!file) return;
+    if (busy) { toast('等这一轮说完再传附件'); return; }
+    var kind = /^video\//.test(file.type) ? 'video' : /^image\//.test(file.type) ? 'image' : '';
+    if (!kind) { toast('只支持照片和视频'); return; }
+    toast(kind === 'video' ? '正在从视频里抽画面…' : '正在处理照片…');
+    try {
+      var a = kind === 'video' ? await prepareVideo(file) : await prepareImage(file);
+      attach = a;
+      lastMedia = { kind: a.kind, name: a.name, media: a.media };
+      renderAttachUI();
+      toast(kind === 'video' ? '视频已就绪（' + a.media.length + ' 帧）' : '照片已就绪');
+    } catch (e) {
+      toast((e && e.message) || '附件处理失败');
+    }
+  }
+
+  function renderAttachUI() {
+    var strip = $('#attachStrip');
+    if (!strip) return;
+    if (!attach) { strip.hidden = true; return; }
+    strip.hidden = false;
+    var th = $('#attachThumb');
+    th.innerHTML = '';
+    if (attach.thumb) {
+      var img = document.createElement('img');
+      img.src = attach.thumb;
+      img.alt = attach.name || '';
+      th.appendChild(img);
+    }
+    $('#attachName').textContent = attach.name || '附件';
+    var mb = attach.size ? (attach.size / 1024 / 1024).toFixed(1) + 'MB' : '';
+    var sizeText = attach.kind === 'video' ? '视频 · ' + attach.media.length + ' 帧' : '照片';
+    $('#attachMeta').textContent = sizeText + (mb ? ' · ' + mb : '') +
+      ' · 先交给' + (attach.kind === 'video' ? '看片 AI n30' : '看图 AI n12');
   }
 
   function renderSearchCard(host, query, results) {
@@ -255,15 +470,18 @@
   }
 
   function buildMessageNode(m) {
+    var who = m.who === 'n12' || m.who === 'n30' ? m.who : 'ai';
     var wrap = document.createElement('div');
-    wrap.className = 'msg ' + (m.role === 'ai' ? 'msg-ai' : 'msg-user');
-    if (m.role === 'ai') wrap.appendChild(makeAvatar('ai'));
+    wrap.className = 'msg ' + (m.role === 'ai' ? ('msg-ai' + (who !== 'ai' ? ' msg-' + who : '')) : 'msg-user');
+    if (m.role === 'ai') wrap.appendChild(makeAvatar(who));
 
     var col = document.createElement('div');
     col.className = 'bubble-col';
 
     var bubble = document.createElement('div');
     bubble.className = 'bubble';
+
+    if (m.att) renderAttCard(bubble, m.att);
 
     if (m.role === 'ai' && m.reasoning) {
       var details = document.createElement('details');
@@ -324,7 +542,7 @@
     var meta = document.createElement('div');
     meta.className = 'msg-meta';
     var label = document.createElement('span');
-    label.textContent = (m.role === 'ai' ? '小谷' : '你') + ' · ' + timeText(m.ts);
+    label.textContent = (m.role === 'ai' ? whoLabel(m.who) : '你') + ' · ' + timeText(m.ts);
     meta.appendChild(label);
     if (m.role === 'ai' && m.text) {
       var copy = document.createElement('button');
@@ -643,6 +861,21 @@
     return { text: text, reasoning: reasoning, ix: ix, fx: fx, htmlFx: htmlFx, music: music };
   }
 
+  // 小谷向 n12 / n30 提问：<ask who="n12">问题</ask>
+  function takeAsks(raw) {
+    var list = [];
+    var text = String(raw || '').replace(/<ask\b([^>]*)>([\s\S]*?)<\/ask>/gi, function (m, attrs, body) {
+      var who = (getAttr(attrs, 'who') || getAttr(attrs, 'to') || 'n12').toLowerCase();
+      if (who !== 'n12' && who !== 'n30') who = 'n12';
+      if (list.length < 1 && String(body || '').trim()) {
+        list.push({ who: who, q: String(body || '').trim().slice(0, 300) });
+      }
+      return '';
+    });
+    text = text.replace(/<ask\b[^>]*>[\s\S]*$/gi, '');
+    return { raw: text, list: list };
+  }
+
   function stripForDisplay(text) {
     var s = String(text || '');
     s = s.replace(/<(fx|fx_code)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
@@ -653,6 +886,8 @@
     s = s.replace(/<ix\b[^>]*?\/?>/gi, '');
     s = s.replace(/<interact\b[^>]*?\/?>/gi, '');
     s = s.replace(/<music\b[^>]*?\/?>/gi, '');
+    s = s.replace(/<ask\b[^>]*>[\s\S]*?<\/ask>/gi, '');
+    s = s.replace(/<ask\b[^>]*>[\s\S]*$/gi, '');
     s = s.replace(/<(tool_call|function_call)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
     s = s.replace(/<(thinking|thought|reason|analysis)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
     s = s.replace(/<(tool_call|function_call|thinking|thought|reason|analysis)\b[^>]*>[\s\S]*$/gi, '');
@@ -661,10 +896,11 @@
   }
 
   /* ---------------- 对话 ---------------- */
-  function pushUser(text, forceFx, forceHtml) {
+  function pushUser(text, forceFx, forceHtml, att) {
     var m = { role: 'user', text: text, ts: Date.now() };
     if (forceFx) m.forceFx = true;
     if (forceHtml) m.forceHtml = true;
+    if (att) m.att = att;
     messages.push(m);
     saveMessages();
     elWelcome.hidden = true;
@@ -672,11 +908,32 @@
     scrollBottom(true);
   }
 
+  // 三个 AI 共享同一份对话记录：给每一个都带上说话人标签
+  function transcriptFor(limit) {
+    var lines = [];
+    messages.filter(function (m) {
+      return (m.text || m.att) && !m.pending;
+    }).slice(-(limit || 12)).forEach(function (m) {
+      if (m.role === 'user') {
+        lines.push('用户：' + (m.text || '（只上传了' + (m.att && m.att.kind === 'video' ? '视频' : '照片') + '）') +
+          (m.att && m.text ? '（同时上传了' + (m.att.kind === 'video' ? '视频' : '照片') + '）' : ''));
+      } else {
+        lines.push(whoLabel(m.who) + '：' + (m.text || ''));
+      }
+    });
+    return lines.join('\n');
+  }
+
   function visibleHistory() {
     return messages.filter(function (m) {
-      return m.text && !m.pending;
+      return (m.text || m.att) && !m.pending;
     }).slice(-12).map(function (m) {
-      return { role: m.role === 'ai' ? 'assistant' : 'user', content: m.text };
+      if (m.role === 'user') {
+        var head = m.att ? ('[用户上传了' + (m.att.kind === 'video' ? '一段视频' : '一张照片') + ']' + (m.text ? '\n' : '')) : '';
+        return { role: 'user', content: head + (m.text || '') };
+      }
+      var tag = m.who === 'n12' ? '[看图 AI 描述] ' : m.who === 'n30' ? '[看片 AI 描述] ' : '';
+      return { role: 'assistant', content: tag + (m.text || '') };
     });
   }
 
@@ -702,7 +959,7 @@
 
   function send(text) {
     text = String(text || '').trim();
-    if (!text) { if (rt.on) rtResume(); return; }
+    if (!text && !attach) { if (rt.on) rtResume(); return; }
     if (busy) { if (rt.on) rtResume(); return; }
     if (voice.on) finishVoice(true);
     if (rt.on && !rt.waiting) {
@@ -716,6 +973,14 @@
       if (rt.on) rtResume();
       return;
     }
+    // @n12 / @n30 / @g：点名让谁回答
+    var who = 'g';
+    var route = text.match(/^[@＠](n12|n30|g)(?=$|[^\w])/i);
+    if (route) {
+      who = route[1].toLowerCase();
+      text = text.slice(route[0].length).replace(/^[，,。.、:：\s]+/, '').trim();
+    }
+
     var forceFx = false, forceHtml = false;
     var hit = text.match(FORCE_FX_RE);
     if (hit) {
@@ -728,10 +993,42 @@
         text = (hit[1] || '随便做一个能导出成 HTML 的特效页面，主题你定').trim();
       }
     }
+    var media = attach ? {
+      kind: attach.kind,
+      name: attach.name,
+      thumb: attach.thumb,
+      media: attach.media.slice()
+    } : null;
+    if (media) lastMedia = { kind: media.kind, name: media.name, media: media.media };
+    var attMeta = media ? { kind: media.kind, name: media.name, thumb: media.thumb } : null;
+
     elInput.value = '';
     autoGrow();
-    pushUser(text, forceFx, forceHtml);
-    runAI(text, forceFx, forceHtml);
+    attach = null;
+    renderAttachUI();
+    pushUser(text, forceFx, forceHtml, attMeta);
+
+    // 点名 n12 / n30：只让它们回答（上下文仍然共享）
+    if (who === 'n12' || who === 'n30') {
+      var picked = null;
+      if (media && media.kind === MEDIA[who].kind) picked = media;
+      else if (lastMedia && lastMedia.kind === MEDIA[who].kind) picked = lastMedia;
+      if (!picked) {
+        toast('先上传' + (MEDIA[who].kind === 'video' ? '一段视频' : '一张照片') + '，' + MEDIA[who].name + '才有东西看');
+        runAI(text || '你好', false, false, {});
+        return;
+      }
+      runMedia(who, text, picked, {});
+      return;
+    }
+
+    // 默认：有附件时先让看图/看片 AI 描述，再交给小谷
+    if (media) {
+      runMedia(media.kind === 'video' ? 'n30' : 'n12', text, media, { thenG: true });
+      return;
+    }
+
+    runAI(text, forceFx, forceHtml, {});
   }
 
   var RETRY_STATUS = { 429: 1, 500: 1, 502: 1, 503: 1, 504: 1 };
@@ -751,6 +1048,175 @@
     return out;
   }
 
+  /* ---------------- 看图 / 看片 AI ---------------- */
+  function mediaChain(who) {
+    var d = MEDIA[who];
+    var out = [];
+    if (mediaWorking[who]) out.push(mediaWorking[who]);
+    if (out.indexOf(d.id) === -1) out.push(d.id);
+    (d.fallback || []).forEach(function (x) { if (out.indexOf(x) === -1) out.push(x); });
+    return out;
+  }
+
+  function mediaSystem(who) {
+    if (who === 'n30') {
+      return [
+        '你是「谷仓 AI」里专门看视频的助手，代号 n30。你只做一件事：把看到的内容如实说出来。',
+        '你会收到同一个视频里按时间顺序抽出的几帧画面（第 1 帧最早，最后一帧最晚），请把它们当成一段连续的视频来理解。',
+        '规则：',
+        '1. 按时间顺序讲清楚发生了什么：人物、动作、场景、镜头变化、画面里的文字、光线和气氛。',
+        '2. 不闲聊、不扮演小谷、不调用互动、不输出任何标签；用短句，不要 Markdown 标题。',
+        '3. 看不清、抽帧没覆盖到的地方就说看不清，绝不编造剧情或台词。',
+        '4. 用户或小谷在问你细节时，直接回答，回答得具体。',
+        '5. 一般 120 字以内；对方明确要求细节时才展开。'
+      ].join('\n');
+    }
+    return [
+      '你是「谷仓 AI」里专门看图的助手，代号 n12。你只做一件事：把看到的内容如实说出来。',
+      '规则：',
+      '1. 只描述画面里真实存在的东西：主体、动作、场景、颜色、数量、画面里的文字、镜头角度和气氛。',
+      '2. 不闲聊、不扮演小谷、不调用互动、不输出任何标签；用短句，不要 Markdown 标题。',
+      '3. 看不清就说看不清，绝不编造画面里没有的东西。',
+      '4. 用户或小谷在问你细节时，直接回答，回答得具体。',
+      '5. 一般 120 字以内；对方明确要求细节时才展开。'
+    ].join('\n');
+  }
+
+  function mediaPrompt(who, question, kind) {
+    var head = who === 'n30'
+      ? '下面是从同一个视频里按时间顺序抽取的几帧画面（第 1 帧最早，最后一帧最晚）。'
+      : '下面这张照片是用户刚刚上传的。';
+    var history = transcriptFor(12);
+    return [
+      head,
+      '',
+      '## 共享对话记录（用户、小谷和你都在里面）',
+      history || '（刚开始）',
+      '',
+      '## 你的任务',
+      question
+        ? ('针对用户最后说的「' + question.slice(0, 160) + '」：' + (kind === 'video' ? '说说视频里发生了什么。' : '说说照片里有什么。'))
+        : ('用户没有额外说明，直接' + (kind === 'video' ? '说说视频里发生了什么。' : '说说照片里有什么。')),
+      '只描述你看到的内容，不要扮演小谷，不要输出标签或 Markdown 标题。'
+    ].join('\n');
+  }
+
+  function mediaForAsk(who) {
+    if (!lastMedia || lastMedia.kind !== MEDIA[who].kind) return null;
+    return lastMedia;
+  }
+
+  async function runMedia(who, question, media, opts) {
+    opts = opts || {};
+    var def = MEDIA[who];
+    var placeholder = { role: 'ai', who: who, text: '', reasoning: '', ts: Date.now(), pending: true };
+    messages.push(placeholder);
+    var node = appendMessage(placeholder, true);
+    node.classList.add('is-pending');
+    showTyping(node);
+    scrollBottom(true);
+
+    setBusy(true);
+    controller = new AbortController();
+    var chain = mediaChain(who);
+
+    var parts = [{ type: 'text', text: mediaPrompt(who, question, media.kind) }];
+    (media.media || []).slice(0, 8).forEach(function (url) {
+      parts.push({ type: 'image_url', image_url: { url: url } });
+    });
+
+    var answer = '', lastErr = null, usedModel = '';
+    for (var i = 0; i < chain.length; i++) {
+      if (i > 0) showTyping(node);
+      var s = { raw: '', reasoning: '', node: node, msg: placeholder, lastPaint: 0 };
+      streaming = s;
+      try {
+        var res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'Authorization': 'Bearer ' + settings.key,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': location.origin + '/ai/',
+            'X-Title': 'Xiaogu - GuCang AI'
+          },
+          body: JSON.stringify({
+            model: chain[i],
+            messages: [
+              { role: 'system', content: mediaSystem(who) },
+              { role: 'user', content: parts }
+            ],
+            stream: true,
+            temperature: 0.35,
+            max_tokens: 1400,
+            top_p: 0.9
+          })
+        });
+        if (!res.ok) {
+          var detail = '';
+          try {
+            var j = await res.json();
+            detail = (j.error && (j.error.message || j.error.code)) || '';
+          } catch (e) {}
+          throw new Error('HTTP ' + res.status + (detail ? '：' + detail : ''));
+        }
+        await readStream(res, s);
+        if (!String(s.raw || '').trim()) throw new Error('这次没有返回内容');
+        answer = s.raw;
+        placeholder.reasoning = s.reasoning;
+        usedModel = chain[i];
+        lastErr = null;
+        break;
+      } catch (e) {
+        lastErr = e;
+        if (e && e.name === 'AbortError') break;
+      }
+    }
+
+    var aborted = lastErr && lastErr.name === 'AbortError';
+    var parsed = extractSpecials(answer, false);
+    var finalText = parsed.text || parsed.reasoning || '';
+
+    placeholder.pending = false;
+    node.classList.remove('is-pending');
+    node._md.innerHTML = '';
+
+    if (!finalText) {
+      placeholder.text = aborted
+        ? '（已停止这次识别）'
+        : ('识别失败：' + ((lastErr && lastErr.message) || '未知错误') + '。可以先 @g 让小谷回答。');
+      placeholder.error = !aborted;
+      var p = document.createElement('p');
+      p.className = aborted ? 'msg-note' : 'msg-error';
+      p.textContent = placeholder.text;
+      node._md.appendChild(p);
+    } else {
+      placeholder.text = finalText;
+      if (parsed.reasoning) placeholder.reasoning = parsed.reasoning;
+      placeholder.model = usedModel;
+      if (placeholder.reasoning) updateThinking(node, placeholder.reasoning, false);
+      renderMD(node._md, finalText);
+      if (usedModel) mediaWorking[who] = usedModel;
+    }
+
+    saveMessages();
+    scrollBottom(true);
+    controller = null;
+    streaming = null;
+    setBusy(false);
+
+    if (opts.thenG && finalText) {
+      var note = [
+        '## 你的同伴刚刚看过内容了',
+        '「' + def.name + '」看了' + (media.kind === 'video' ? '用户上传的视频' : '用户上传的照片') + '，它看到的是：',
+        finalText,
+        '',
+        '请用你自己的话接着回应（不要复述整段描述，只挑你在意的细节，可以带上你的经历或追问）。如果你还需要更多细节，可以在回复里写 <ask who="' + who + '">问题</ask>。'
+      ].join('\n');
+      runAI(question || '看看这个', false, false, { extraNote: note, depth: opts.depth || 0 });
+    }
+  }
+
   function showTyping(node) {
     node._md.innerHTML = '';
     var t = document.createElement('div');
@@ -759,7 +1225,9 @@
     node._md.appendChild(t);
   }
 
-  async function runAI(userText, forceFx, forceHtml) {
+  async function runAI(userText, forceFx, forceHtml, opts) {
+    opts = opts || {};
+    var pendingAsk = null;
     var placeholder = {
       role: 'ai', text: '', reasoning: '', ix: [], ts: Date.now(), pending: true
     };
@@ -784,7 +1252,7 @@
 
     // 联网：先抓资料再回答（#z / #c 不触发，避免拖慢特效生成）
     var searchQuery = '', searchResults = null;
-    var doSearch = settings.web && !forceFx && !forceHtml && userText.length >= 4;
+    var doSearch = settings.web && !forceFx && !forceHtml && !opts.extraNote && userText.length >= 4;
     if (doSearch) {
       searchQuery = userText.slice(0, 140);
       var smk = document.createElement('div');
@@ -822,7 +1290,7 @@
             },
             body: JSON.stringify({
               model: chain[attempt],
-              messages: [{ role: 'system', content: buildSystemPrompt({ forceFx: forceFx, forceHtml: forceHtml, searchQuery: searchQuery || null, searchResults: searchResults }) }].concat(visibleHistory()),
+              messages: [{ role: 'system', content: buildSystemPrompt({ forceFx: forceFx, forceHtml: forceHtml, searchQuery: searchQuery || null, searchResults: searchResults, extraNote: opts.extraNote || '' }) }].concat(visibleHistory()),
               stream: true,
               temperature: 0.85,
               max_tokens: forceHtml ? Math.max(12000, settings.maxTokens * 4) : (forceFx ? Math.max(8000, settings.maxTokens * 3) : settings.maxTokens),
@@ -859,6 +1327,11 @@
         }
       }
 
+      // 小谷可能想追问看图 / 看片 AI：<ask who="n12">…</ask>
+      var askInfo = takeAsks(streaming.raw);
+      streaming.raw = askInfo.raw;
+      var asks = askInfo.list;
+
       var raw = streaming.raw;
       var parsed = extractSpecials(raw, forceFx || forceHtml || settings.fx);
       var fxTruncated = forceFx && /<fx\b/i.test(raw) && !/<\/fx\b/i.test(raw);
@@ -875,8 +1348,8 @@
         streaming.reasoning = (streaming.reasoning ? streaming.reasoning + '\n\n' : '') + parsed.reasoning;
       }
       var finalText = parsed.text;
-      if (!finalText) {
-        finalText = (placeholder.fx && placeholder.fx.length) || (placeholder.htmlFx && placeholder.htmlFx.length)
+      if (!finalText && !asks.length) {
+        finalText = (parsed.fx && parsed.fx.length) || (parsed.htmlFx && parsed.htmlFx.length)
           ? '' : '（模型只给出了思考，没有正文。要不要再问我一次？）';
       }
 
@@ -908,6 +1381,17 @@
         window.MUSIC.play(songQ, node._md).then(function (track) {
           if (!track) toast('没找到这首歌，换个说法我再放');
         });
+      }
+
+      // 小谷想追问看图的 / 看片的 AI：交给它，再把答案回给小谷
+      if (asks.length && (opts.depth || 0) < 1) {
+        var ask = asks[0];
+        var askMedia = mediaForAsk(ask.who);
+        if (askMedia) {
+          pendingAsk = { who: ask.who, q: ask.q, media: askMedia, depth: opts.depth || 0 };
+        } else {
+          toast(MEDIA[ask.who].name + '不在场（这轮没有' + (MEDIA[ask.who].kind === 'video' ? '视频' : '照片') + '可看）');
+        }
       }
     } catch (err) {
       var aborted = err && (err.name === 'AbortError');
@@ -951,6 +1435,13 @@
       setBusy(false);
       scrollBottom();
       if (rt.on) rtAfterReply(placeholder);
+      if (pendingAsk) {
+        var pa = pendingAsk;
+        pendingAsk = null;
+        setTimeout(function () {
+          runMedia(pa.who, pa.q, pa.media, { thenG: true, depth: pa.depth + 1 });
+        }, 80);
+      }
     }
   }
 
@@ -1632,10 +2123,28 @@
     });
     elStop.addEventListener('click', stopAI);
 
+    var fileInput = $('#fileInput');
+    $('#attachBtn').addEventListener('click', function () {
+      if (busy) { toast('等这一轮说完再传附件'); return; }
+      fileInput.click();
+    });
+    fileInput.addEventListener('change', function () {
+      var f = fileInput.files && fileInput.files[0];
+      fileInput.value = '';
+      if (f) handleUpload(f);
+    });
+    $('#attachRemove').addEventListener('click', function () {
+      attach = null;
+      renderAttachUI();
+    });
+
     $('#newChat').addEventListener('click', function () {
       if (busy) stopAI();
       if (window.FXC) FXC.stopAll();
       messages = [];
+      attach = null;
+      lastMedia = null;
+      renderAttachUI();
       saveMessages();
       renderAll();
       closeSidebar();
@@ -1643,10 +2152,13 @@
     });
 
     $('#clearChat').addEventListener('click', function () {
-      if (!messages.length) { toast('现在就是新对话'); return; }
+      if (!messages.length && !attach) { toast('现在就是新对话'); return; }
       if (busy) stopAI();
       if (window.FXC) FXC.stopAll();
       messages = [];
+      attach = null;
+      lastMedia = null;
+      renderAttachUI();
       saveMessages();
       renderAll();
       toast('对话已清空');
