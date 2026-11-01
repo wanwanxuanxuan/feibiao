@@ -2277,6 +2277,7 @@
   }
 
   // 调 ACE-Step：先 POST 建任务，再读 SSE 拿结果
+  // 免费 GPU 偶发失败（排队/显存），同一请求重试几次，成功率会高很多
   async function aceStepGenerate(style, lyrics, seconds, ctl, onStage) {
     var data = [
       seconds, style, lyrics, 16, 15, 'euler', 'apg', 10, null,
@@ -2289,33 +2290,24 @@
     if (ctl) ctl.signal.addEventListener('abort', onUserAbort);
     // 免费 GPU 排队可能久，给 3 分钟
     var timer = setTimeout(function () { timedOut = true; onAbort(); }, 180000);
+    var lastErr = null;
     try {
-      var res = await fetch(ACE_BASE + '/gradio_api/call/__call__', {
-        method: 'POST',
-        signal: local.signal,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: data })
-      });
-      if (!res.ok) throw new Error('音乐模型接口 HTTP ' + res.status);
-      var j = await res.json();
-      if (!j || !j.event_id) throw new Error('音乐模型没有返回任务号');
-      if (onStage) onStage('排队中');
-
-      var res2 = await fetch(ACE_BASE + '/gradio_api/call/__call__/' + j.event_id, { signal: local.signal });
-      if (!res2.ok) throw new Error('音乐模型结果读取失败 HTTP ' + res2.status);
-      var raw = await res2.text();
-      if (/event:\s*error/.test(raw)) throw new Error('音乐模型生成失败');
-      var payload = '';
-      var lines = raw.split('\n');
-      for (var i = 0; i < lines.length; i++) {
-        var ln = lines[i];
-        if (/^data:\s*/.test(ln)) payload = ln.replace(/^data:\s*/, '').trim();
+      for (var attempt = 0; attempt < 3; attempt++) {
+        if (local.signal.aborted) break;
+        if (attempt > 0) {
+          if (onStage) onStage('重试中（第 ' + (attempt + 1) + ' 次）');
+          await sleep(2500);
+          if (local.signal.aborted) break;
+        }
+        if (onStage) onStage('排队中');
+        try {
+          var url = await aceStepOnce(data, local.signal);
+          return url;
+        } catch (e) {
+          if (e && e.name === 'AbortError') throw e;
+          lastErr = e;
+        }
       }
-      if (!payload) throw new Error('音乐模型没有返回结果');
-      var out = JSON.parse(payload);
-      var file = out && out[0];
-      if (!file || !file.url) throw new Error('音乐模型没有返回音频');
-      return file.url;
     } catch (e) {
       // 自家超时不算用户取消：要让上层走本地兜底
       if (timedOut && !(ctl && ctl.signal.aborted)) throw new Error('音乐模型排队超时');
@@ -2324,6 +2316,40 @@
       clearTimeout(timer);
       if (ctl) ctl.signal.removeEventListener('abort', onUserAbort);
     }
+    if (timedOut && !(ctl && ctl.signal.aborted)) throw new Error('音乐模型排队超时');
+    throw (lastErr || new Error('音乐模型没有返回音频'));
+  }
+
+  function sleep(ms) {
+    return new Promise(function (r) { setTimeout(r, ms); });
+  }
+
+  async function aceStepOnce(data, signal) {
+    var res = await fetch(ACE_BASE + '/gradio_api/call/__call__', {
+      method: 'POST',
+      signal: signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: data })
+    });
+    if (!res.ok) throw new Error('音乐模型接口 HTTP ' + res.status);
+    var j = await res.json();
+    if (!j || !j.event_id) throw new Error('音乐模型没有返回任务号');
+
+    var res2 = await fetch(ACE_BASE + '/gradio_api/call/__call__/' + j.event_id, { signal: signal });
+    if (!res2.ok) throw new Error('音乐模型结果读取失败 HTTP ' + res2.status);
+    var raw = await res2.text();
+    if (/event:\s*error/.test(raw)) throw new Error('音乐模型生成失败');
+    var payload = '';
+    var lines = raw.split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      var ln = lines[i];
+      if (/^data:\s*/.test(ln)) payload = ln.replace(/^data:\s*/, '').trim();
+    }
+    if (!payload) throw new Error('音乐模型没有返回结果');
+    var out = JSON.parse(payload);
+    var file = out && out[0];
+    if (!file || !file.url) throw new Error('音乐模型没有返回音频');
+    return file.url;
   }
 
   // 兜底：本地作曲（Web Audio）+ WAV 导出。提示词只作为随机种子。
