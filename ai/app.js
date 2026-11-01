@@ -965,6 +965,17 @@
         v.controls = true;
         v.playsInline = true;
         v.style.maxWidth = '100%';
+        // 录出来的 WebM 没有写时长元数据，浏览器会报 Infinity。跳到极远处再回来，让它算出真实时长。
+        v.addEventListener('loadedmetadata', function () {
+          if (!isFinite(v.duration)) {
+            v.currentTime = 1e101;
+            var fix = function () {
+              v.removeEventListener('timeupdate', fix);
+              v.currentTime = 0;
+            };
+            v.addEventListener('timeupdate', fix);
+          }
+        });
         player.appendChild(v);
       } else if (job.who === 'music') {
         var au = document.createElement('audio');
