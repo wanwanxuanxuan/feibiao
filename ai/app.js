@@ -44,18 +44,25 @@
   };
   var mediaWorking = { n12: '', n30: '', doc: '' };
 
-  // 三个「生成类」AI：视频、音乐、图片。都是异步长任务，要能在后台跑完。
-  // 注：用户写的是 oogle/lyria，实际是 google/lyria。
+  // 三个「生成类」AI：视频、音乐、图片。都是异步任务，要能在后台跑完。
+  // 全部走免费方案：图片用 Pollinations（免 Key，几秒出图）；视频用关键帧 + 本地合成 WebM；
+  // 音乐用 Web Audio 本地作曲编码 WAV。（OpenRouter 上的视频/音乐/图片模型都没有可用免费档）
   var GEN = {
-    video: { id: 'bytedance/seedance-2.0:free', name: '视频 AI', short: 'video', emoji: '🎬', endpoint: 'videos' },
-    music: { id: 'google/lyria-3-pro-preview', name: '音乐 AI', short: 'music', emoji: '🎵', endpoint: 'chat' },
-    image: { id: 'bytedance-seed/seedream-4.5:free', name: '画图 AI', short: 'image', emoji: '🖼', endpoint: 'chat' }
+    video: { name: '视频 AI', short: 'video', emoji: '🎬', engine: '本地合成 · 约 9 秒短片' },
+    music: { name: '音乐 AI', short: 'music', emoji: '🎵', engine: '本地合成 · 原创小曲' },
+    image: { name: '画图 AI', short: 'image', emoji: '🖼', engine: 'Pollinations · flux' }
   };
   var GEN_ALIASES = {
     video: ['video', 'seedance', '视频', 'videogen'],
     music: ['music', 'lyria', '音乐', 'song'],
     image: ['image', 'seedream', '图片', '画图', '图', '画']
   };
+
+  // 免费图像生成：Pollinations 匿名接口，按顺序试这几个快模型
+  var IMG_MODELS = ['flux', 'turbo', 'sana'];
+  // 视频关键帧（走同一个免费接口）
+  var VIDEO_FRAMES = 4;
+  var VIDEO_FRAME_MS = 2300;
   var LS_JOBS = 'yg_ai_jobs_v1';
 
   var LS_MSG = 'yg_ai_msgs_v1';
@@ -266,13 +273,14 @@
       '- 用户上传任意文档后，客户端会先让 doc 读完，再把内容交给你。你可以据此继续解释、翻译、总结或改写。',
       '',
       '## 你的三个生成帮手（做视频 / 音乐 / 图片）',
-      '- 谷仓里还有三个负责「做东西」的 AI：视频 AI（seedance，做短视频）、音乐 AI（lyria，做音乐）、画图 AI（seedream，画图片）。',
+      '- 谷仓里还有三个负责「做东西」的 AI：视频 AI（做约 9 秒的短片，几张关键帧推拉镜头拼成）、音乐 AI（做十几秒的原创小曲，本地合成）、画图 AI（用免费模型 flux 出 1024×1024 的图）。',
       '- 用户可以用 @video / @music / @image 直接点名让它们生成；这时你不用抢话，它们做完会回来找你总结。',
       '- 如果用户没有点名，但你判断他想要的是「生成一段视频 / 一首音乐 / 一张图片」，就在回复最后输出一行：',
       '  <route to="video" prompt="把用户想要的内容提炼成一句清晰的提示词"/>',
       '  （to 可选 video / music / image；prompt 里写生成提示词，不要写命令。）',
       '- 派单后，客户端会启动对应的生成 AI，生成完会自动把结果交给你，你再用一两句话回应。派单这一轮你照常回复用户就行，把 <route/> 放在最后。',
       '- 拿不准用户要哪种时，先简短问一句，不要乱派。用户只是想聊天、问问题、查资料时，不要派单。',
+      '- 它们做出来的东西比较短（视频约 9 秒、音乐十几秒、图片一张），别承诺长篇或多次生成，除非用户明确要。',
       '',
       '## 回复要求',
       '1. 用中文回答，口语化，简洁但有信息量；可以少量用 emoji，不要每句都堆。',
@@ -362,13 +370,13 @@
       a.title = '读文档 AI · doc';
     } else if (kind === 'video') {
       a.textContent = '🎬';
-      a.title = '视频 AI · seedance';
+      a.title = '视频 AI · 免费合成';
     } else if (kind === 'music') {
       a.textContent = '🎵';
-      a.title = '音乐 AI · lyria';
+      a.title = '音乐 AI · 免费合成';
     } else if (kind === 'image') {
       a.textContent = '🖼';
-      a.title = '画图 AI · seedream';
+      a.title = '画图 AI · flux';
     } else if (kind === 'ai') {
       a.innerHTML = '<span>谷</span>';
     }
@@ -379,9 +387,9 @@
     if (who === 'n12') return '看图 AI · n12';
     if (who === 'n30') return '看片 AI · n30';
     if (who === 'doc') return '读文档 AI · doc';
-    if (who === 'video') return '视频 AI · seedance';
-    if (who === 'music') return '音乐 AI · lyria';
-    if (who === 'image') return '画图 AI · seedream';
+    if (who === 'video') return '视频 AI · 免费合成';
+    if (who === 'music') return '音乐 AI · 免费合成';
+    if (who === 'image') return '画图 AI · flux';
     return '小谷';
   }
 
@@ -914,9 +922,8 @@
     if (!job) return '任务不存在';
     if (job.status === 'pending') return '排队中…';
     if (job.status === 'running') {
-      if (job.who === 'video') return '🎬 视频生成中…';
-      if (job.who === 'music') return '🎵 音乐生成中…';
-      return '🖼 图片生成中…';
+      var base = job.who === 'video' ? '🎬 视频合成中…' : job.who === 'music' ? '🎵 音乐合成中…' : '🖼 图片生成中…';
+      return job.progress ? base + ' ' + job.progress : base;
     }
     if (job.status === 'done') {
       if (job.who === 'video') return '✅ 视频生成完成';
@@ -1829,8 +1836,8 @@
     var def = GEN[job.who];
     var media = genMediaCache[job.id] || {};
     var desc = def.name + '刚刚完成了一次生成。';
-    if (job.who === 'video') desc += '内容是一段视频，提示词是：' + job.prompt;
-    else if (job.who === 'music') desc += '内容是一段音乐' + (media.transcript ? '，歌词大意：' + media.transcript : '') + '，提示词是：' + job.prompt;
+    if (job.who === 'video') desc += '内容是一段约 9 秒的短片，提示词是：' + job.prompt;
+    else if (job.who === 'music') desc += '内容是一段原创音乐' + (media.seconds ? '（约 ' + media.seconds + ' 秒）' : '') + '，提示词是：' + job.prompt;
     else desc += '内容是一张图片，提示词是：' + job.prompt;
     var note = [
       '## 你的同伴刚刚生成了东西',
@@ -1840,244 +1847,435 @@
     runAI('', false, false, { extraNote: note, depth: 0 });
   }
 
-  // 视频：OpenRouter /api/v1/videos，服务端异步任务，可跨页面续跑
+  // 视频：没有可用的免费视频模型，改成浏览器本地合成。
+  // 先用免费的 Pollinations 出几张关键帧，再用 canvas 做推拉镜头 + 交叉淡化，
+  // MediaRecorder 录成 WebM。全程在本地跑，不依赖付费接口。
   async function runVideoGen(job, ctl) {
-    var def = GEN.video;
-    if (!job.remoteId) {
-      updateJob(job.id, { status: 'running' });
-      var res = await fetch('https://openrouter.ai/api/v1/videos', {
-        method: 'POST',
-        signal: ctl.signal,
-        headers: {
-          'Authorization': 'Bearer ' + settings.key,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': location.origin + '/ai/',
-          'X-Title': 'Xiaogu - GuCang AI'
-        },
-        body: JSON.stringify({
-          model: def.id,
-          prompt: job.prompt
-        })
-      });
-      if (!res.ok) {
-        var detail = '';
-        try { var j = await res.json(); detail = (j.error && (j.error.message || j.error.code)) || ''; } catch (e) {}
-        throw new Error('HTTP ' + res.status + (detail ? '：' + detail : ''));
-      }
-      var created = await res.json();
-      var remoteId = created.id || (created.data && created.data.id);
-      var pollingUrl = created.polling_url || (created.data && created.data.polling_url);
-      if (!remoteId) throw new Error('服务端没返回任务 ID');
-      updateJob(job.id, { remoteId: remoteId, pollingUrl: pollingUrl || null });
-    }
+    updateJob(job.id, { status: 'running', progress: '准备关键帧…' });
 
-    // 轮询
-    var url = job.pollingUrl || ('https://openrouter.ai/api/v1/videos/' + job.remoteId);
-    var waited = 0;
-    while (true) {
+    var frames = [];
+    for (var i = 0; i < VIDEO_FRAMES; i++) {
       if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
-      var pr = await fetch(url, {
-        signal: ctl.signal,
-        headers: {
-          'Authorization': 'Bearer ' + settings.key,
-          'HTTP-Referer': location.origin + '/ai/',
-          'X-Title': 'Xiaogu - GuCang AI'
-        }
-      });
-      if (!pr.ok) {
-        var d = '';
-        try { var pj = await pr.json(); d = (pj.error && (pj.error.message || pj.error.code)) || ''; } catch (e) {}
-        throw new Error('轮询失败 HTTP ' + pr.status + (d ? '：' + d : ''));
-      }
-      var info = await pr.json();
-      var st = info.status || (info.data && info.data.status);
-      if (st === 'completed') break;
-      if (st === 'failed' || st === 'cancelled') {
-        var errMsg = (info.error && (info.error.message || info.error.code)) || '服务端生成失败';
-        throw new Error(errMsg);
-      }
-      waited += 4000;
-      if (waited > 10 * 60 * 1000) throw new Error('生成超时（超过 10 分钟）');
-      await sleep(4000);
-    }
-
-    // 拉取视频内容
-    var contentRes = await fetch('https://openrouter.ai/api/v1/videos/' + job.remoteId + '/content?index=0', {
-      signal: ctl.signal,
-      headers: {
-        'Authorization': 'Bearer ' + settings.key,
-        'HTTP-Referer': location.origin + '/ai/',
-        'X-Title': 'Xiaogu - GuCang AI'
-      }
-    });
-    if (!contentRes.ok) throw new Error('下载视频失败 HTTP ' + contentRes.status);
-    var blob = await contentRes.blob();
-    var url2 = URL.createObjectURL(blob);
-    genMediaCache[job.id] = { url: url2, mime: blob.type || 'video/mp4' };
-    updateJob(job.id, { status: 'done', result: { mime: blob.type || 'video/mp4', size: blob.size } });
-    return true;
-  }
-
-  // 音乐：lyria 走 chat/completions 流式，audio 数据在 delta.audio.data（base64 分片）
-  async function runMusicGen(job, ctl) {
-    var def = GEN.music;
-    updateJob(job.id, { status: 'running' });
-    var res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      signal: ctl.signal,
-      headers: {
-        'Authorization': 'Bearer ' + settings.key,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': location.origin + '/ai/',
-        'X-Title': 'Xiaogu - GuCang AI'
-      },
-      body: JSON.stringify({
-        model: def.id,
-        messages: [{ role: 'user', content: job.prompt }],
-        stream: true
-      })
-    });
-    if (!res.ok) {
-      var detail = '';
-      try { var j = await res.json(); detail = (j.error && (j.error.message || j.error.code)) || ''; } catch (e) {}
-      throw new Error('HTTP ' + res.status + (detail ? '：' + detail : ''));
-    }
-
-    var base64Chunks = [];
-    var transcript = '';
-    var mime = 'audio/mpeg';
-    var reader = res.body.getReader();
-    var decoder = new TextDecoder();
-    var buf = '';
-    var sep = /\r?\n\r?\n/;
-    while (true) {
-      var r = await reader.read();
-      if (r.done) break;
-      buf += decoder.decode(r.value, { stream: true });
-      var m;
-      while ((m = sep.exec(buf))) {
-        var chunk = buf.slice(0, m.index);
-        buf = buf.slice(m.index + m[0].length);
-        parseMusicChunk(chunk, base64Chunks, function (t) { transcript += t; }, function (mt) { if (mt) mime = mt; });
-      }
-    }
-    if (buf.trim()) parseMusicChunk(buf, base64Chunks, function (t) { transcript += t; }, function (mt) { if (mt) mime = mt; });
-
-    if (!base64Chunks.length) throw new Error('没有收到音频数据');
-    var binary = atob(base64Chunks.join(''));
-    var bytes = new Uint8Array(binary.length);
-    for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    var blob = new Blob([bytes], { type: mime });
-    var url = URL.createObjectURL(blob);
-    genMediaCache[job.id] = { url: url, mime: mime, transcript: transcript };
-    updateJob(job.id, { status: 'done', result: { mime: mime, size: blob.size, transcript: transcript } });
-    return true;
-  }
-
-  function parseMusicChunk(chunk, outChunks, onTranscript, onMime) {
-    var lines = chunk.split('\n');
-    for (var i = 0; i < lines.length; i++) {
-      var line = lines[i].trim();
-      if (!line || line.charAt(0) === ':') continue;
-      if (line.indexOf('data:') !== 0) continue;
-      var data = line.slice(5).trim();
-      if (!data || data === '[DONE]') continue;
-      var j;
-      try { j = JSON.parse(data); } catch (e) { continue; }
-      if (j.error) throw new Error(j.error.message || '模型返回错误');
-      var choice = j.choices && j.choices[0];
-      var delta = (choice && choice.delta) || {};
-      if (delta.audio) {
-        if (delta.audio.data) outChunks.push(delta.audio.data);
-        if (delta.audio.transcript) onTranscript(delta.audio.transcript);
-        if (delta.audio.mime_type) onMime(delta.audio.mime_type);
-      }
-    }
-  }
-
-  // 图片：seedream 走 chat/completions，图片在返回里
-  async function runImageGen(job, ctl) {
-    var def = GEN.image;
-    updateJob(job.id, { status: 'running' });
-    var res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      signal: ctl.signal,
-      headers: {
-        'Authorization': 'Bearer ' + settings.key,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': location.origin + '/ai/',
-        'X-Title': 'Xiaogu - GuCang AI'
-      },
-      body: JSON.stringify({
-        model: def.id,
-        messages: [{ role: 'user', content: job.prompt }]
-      })
-    });
-    if (!res.ok) {
-      var detail = '';
-      try { var j = await res.json(); detail = (j.error && (j.error.message || j.error.code)) || ''; } catch (e) {}
-      throw new Error('HTTP ' + res.status + (detail ? '：' + detail : ''));
-    }
-    var data = await res.json();
-    var msg0 = data.choices && data.choices[0] && data.choices[0].message;
-    var imgUrl = extractImageUrl(msg0);
-    if (!imgUrl) throw new Error('模型没有返回图片');
-
-    var blobUrl;
-    if (imgUrl.indexOf('data:') === 0) {
-      var m = imgUrl.match(/^data:([^;]+);base64,(.+)$/);
-      if (!m) throw new Error('图片数据格式异常');
-      var binary = atob(m[2]);
-      var bytes = new Uint8Array(binary.length);
-      for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      blobUrl = URL.createObjectURL(new Blob([bytes], { type: m[1] }));
-      genMediaCache[job.id] = { url: blobUrl, mime: m[1] };
-    } else {
-      // 远程 URL：下载成 blob，避免外链过期 / 跨域
+      updateJob(job.id, { progress: '关键帧 ' + (i + 1) + '/' + VIDEO_FRAMES });
+      var seed = hashCode(job.prompt + ' #' + i);
+      var scene = job.prompt + '，镜头 ' + (i + 1) + '，电影感光影，16:9 构图';
+      var drawable;
       try {
-        var ir = await fetch(imgUrl, { signal: ctl.signal });
-        if (ir.ok) {
-          var blob = await ir.blob();
-          blobUrl = URL.createObjectURL(blob);
-          genMediaCache[job.id] = { url: blobUrl, mime: blob.type || 'image/png' };
-        } else {
-          genMediaCache[job.id] = { url: imgUrl, mime: 'image/*', remote: true };
-        }
+        var blob = await pollinationsImage(scene, ctl, 960, 540, seed);
+        drawable = await blobToDrawable(blob);
       } catch (e) {
-        genMediaCache[job.id] = { url: imgUrl, mime: 'image/*', remote: true };
+        if (e && e.name === 'AbortError') throw e;
+        // 免费图床不通时用本地渐变画面兜底，视频照样能出
+        drawable = gradientFrame(seed);
       }
+      frames.push(drawable);
     }
-    updateJob(job.id, { status: 'done', result: { mime: genMediaCache[job.id].mime } });
+
+    if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
+    updateJob(job.id, { progress: '录制中 0%' });
+
+    var videoBlob = await recordCanvasVideo(frames, ctl, function (pct) {
+      updateJob(job.id, { progress: '录制中 ' + pct + '%' });
+    });
+    var url = URL.createObjectURL(videoBlob);
+    var mime = videoBlob.type || 'video/webm';
+    genMediaCache[job.id] = { url: url, mime: mime };
+    updateJob(job.id, { status: 'done', progress: '', result: { mime: mime, size: videoBlob.size } });
     return true;
   }
 
-  function extractImageUrl(msg) {
-    if (!msg) return '';
-    // 1. message.images 数组
-    if (Array.isArray(msg.images) && msg.images.length) {
-      var im = msg.images[0];
-      if (typeof im === 'string') return im;
-      if (im && im.url) return im.url;
-    }
-    // 2. content 是数组（多模态）
-    if (Array.isArray(msg.content)) {
-      for (var i = 0; i < msg.content.length; i++) {
-        var p = msg.content[i];
-        if (p && p.type === 'image_url' && p.image_url && p.image_url.url) return p.image_url.url;
+  // 免费图像：Pollinations 匿名接口，免 Key，几秒出图；模型依次兜底
+  async function pollinationsImage(prompt, ctl, w, h, seed) {
+    if (ctl && ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
+    var lastErr = '';
+    for (var i = 0; i < IMG_MODELS.length; i++) {
+      var url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) +
+        '?width=' + w + '&height=' + h + '&nologo=true&model=' + IMG_MODELS[i] +
+        '&seed=' + (seed % 2147483647) + '&referrer=gucang';
+      var local = new AbortController();
+      var onAbort = function () { try { local.abort(); } catch (e) {} };
+      if (ctl) ctl.signal.addEventListener('abort', onAbort);
+      var timer = setTimeout(onAbort, 45000);
+      try {
+        var res = await fetch(url, { signal: local.signal });
+        if (!res.ok) { lastErr = 'HTTP ' + res.status; continue; }
+        var blob = await res.blob();
+        if (blob.size < 1024) { lastErr = '返回内容为空'; continue; }
+        return blob;
+      } catch (e) {
+        if (ctl && ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
+        lastErr = (e && e.message) ? e.message : String(e);
+      } finally {
+        clearTimeout(timer);
+        if (ctl) ctl.signal.removeEventListener('abort', onAbort);
       }
     }
-    // 3. content 字符串里的 markdown 图片 / data URL / http URL
-    var text = typeof msg.content === 'string' ? msg.content : '';
-    var dm = text.match(/!\[[^\]]*\]\((https?:\/\/[^)]+)\)/i);
-    if (dm) return dm[1];
-    var bm = text.match(/(data:image\/[a-zA-Z+]+;base64,[A-Za-z0-9+/=]+)/);
-    if (bm) return bm[1];
-    var um = text.match(/(https?:\/\/[^\s"'<>]+\.(png|jpe?g|webp|gif)(\?[^\s"'<>]*)?)/i);
-    if (um) return um[1];
-    return '';
+    throw new Error('免费画图服务暂时不可用' + (lastErr ? '（' + lastErr + '）' : ''));
   }
 
-  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  async function blobToDrawable(blob) {
+    if (typeof createImageBitmap === 'function') {
+      try { return await createImageBitmap(blob); } catch (e) {}
+    }
+    var url = URL.createObjectURL(blob);
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('图片解码失败')); };
+      img.src = url;
+    });
+  }
+
+  // 兜底画面：本地渐变 + 光斑，按种子变化
+  function gradientFrame(seed) {
+    var W = 960, H = 540;
+    var cv = document.createElement('canvas');
+    cv.width = W;
+    cv.height = H;
+    var g = cv.getContext('2d');
+    var rnd = rng(seed);
+    var hue = Math.floor(rnd() * 360);
+    var lg = g.createLinearGradient(0, 0, W, H);
+    lg.addColorStop(0, 'hsl(' + hue + ',68%,26%)');
+    lg.addColorStop(0.55, 'hsl(' + ((hue + 45) % 360) + ',72%,46%)');
+    lg.addColorStop(1, 'hsl(' + ((hue + 95) % 360) + ',64%,16%)');
+    g.fillStyle = lg;
+    g.fillRect(0, 0, W, H);
+    for (var i = 0; i < 6; i++) {
+      var x = rnd() * W, y = rnd() * H, r = 70 + rnd() * 190;
+      var h2 = (hue + 30 * i) % 360;
+      var rg = g.createRadialGradient(x, y, 0, x, y, r);
+      rg.addColorStop(0, 'hsla(' + h2 + ',90%,70%,0.5)');
+      rg.addColorStop(1, 'hsla(' + h2 + ',90%,70%,0)');
+      g.fillStyle = rg;
+      g.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+    return cv;
+  }
+
+  // 把一串画面录成视频：每张做推拉镜头，交接处交叉淡化
+  function recordCanvasVideo(frames, ctl, onProgress) {
+    return new Promise(function (resolve, reject) {
+      if (!frames.length) { reject(new Error('没有可用的画面')); return; }
+      if (typeof MediaRecorder === 'undefined') {
+        reject(new Error('这个浏览器不支持本地视频合成（需要 MediaRecorder）'));
+        return;
+      }
+      var W = 960, H = 540;
+      var canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      var ctx = canvas.getContext('2d');
+      var stream = null;
+      try { stream = canvas.captureStream ? canvas.captureStream(30) : null; } catch (e) { stream = null; }
+      if (!stream) {
+        reject(new Error('这个浏览器不支持本地视频合成（需要 canvas.captureStream）'));
+        return;
+      }
+
+      var types = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+      var mime = '';
+      for (var i = 0; i < types.length; i++) {
+        if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(types[i])) { mime = types[i]; break; }
+      }
+      var rec;
+      try {
+        rec = mime
+          ? new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 2500000 })
+          : new MediaRecorder(stream);
+      } catch (e) {
+        reject(new Error('无法启动录制：' + (e && e.message ? e.message : e)));
+        return;
+      }
+
+      var chunks = [];
+      var seg = VIDEO_FRAME_MS;
+      var fade = 520;
+      var total = frames.length * seg;
+      var startTs = 0;
+      var raf = 0;
+      var stopped = false;
+      var abortFlag = false;
+
+      function finish() {
+        if (stopped) return;
+        stopped = true;
+        cancelAnimationFrame(raf);
+        try { if (rec.state !== 'inactive') rec.stop(); } catch (e) { reject(new Error('录制停止失败')); }
+      }
+      var onAbort = function () { abortFlag = true; finish(); };
+
+      rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) chunks.push(ev.data); };
+      rec.onerror = function (ev) {
+        if (stopped) return;
+        stopped = true;
+        cancelAnimationFrame(raf);
+        ctl.signal.removeEventListener('abort', onAbort);
+        reject(new Error('录制出错：' + ((ev && ev.error && ev.error.name) || '未知')));
+      };
+      rec.onstop = function () {
+        ctl.signal.removeEventListener('abort', onAbort);
+        try { stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+        if (abortFlag) { reject(new DOMException('aborted', 'AbortError')); return; }
+        var blob = new Blob(chunks, { type: rec.mimeType || mime || 'video/webm' });
+        if (!blob.size) { reject(new Error('录制结果为空')); return; }
+        resolve(blob);
+      };
+
+      var lastPct = -1;
+      function draw(ts) {
+        if (!startTs) startTs = ts;
+        var el = Math.min(ts - startTs, total - 1);
+        var idx = Math.min(frames.length - 1, Math.floor(el / seg));
+        var t = (el - idx * seg) / seg;
+        drawVideoFrame(ctx, frames[idx], t, W, H);
+        var next = frames[idx + 1];
+        if (next) {
+          var tail = seg * (idx + 1) - el;
+          if (tail < fade) {
+            ctx.globalAlpha = Math.max(0, Math.min(1, 1 - tail / fade));
+            drawVideoFrame(ctx, next, 0, W, H);
+            ctx.globalAlpha = 1;
+          }
+        }
+        if (onProgress) {
+          var pct = Math.min(99, Math.round(el / total * 100));
+          if (pct !== lastPct) { lastPct = pct; onProgress(pct); }
+        }
+        if (el >= total - 1) { finish(); return; }
+        raf = requestAnimationFrame(draw);
+      }
+
+      ctl.signal.addEventListener('abort', onAbort);
+      drawVideoFrame(ctx, frames[0], 0, W, H);
+      rec.start(1000);
+      raf = requestAnimationFrame(draw);
+    });
+  }
+
+  function drawVideoFrame(ctx, src, t, W, H) {
+    var sw = src.naturalWidth || src.width || W;
+    var sh = src.naturalHeight || src.height || H;
+    if (!sw || !sh) return;
+    var z = 1.06 + 0.1 * t;                       // 缓慢推近
+    var scale = Math.max(W / sw, H / sh) * z;
+    var dw = sw * scale, dh = sh * scale;
+    var dx = (W - dw) / 2 + (t - 0.5) * W * 0.02; // 轻微平移
+    var dy = (H - dh) / 2 + (0.5 - t) * H * 0.03;
+    ctx.drawImage(src, dx, dy, dw, dh);
+  }
+
+  function hashCode(s) {
+    var h = 2166136261;
+    s = String(s || '');
+    for (var i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = (h * 16777619) >>> 0;
+    }
+    return h >>> 0;
+  }
+
+  function rng(seed) {
+    var s = (seed >>> 0) || 1;
+    return function () {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
+  }
+
+  // 音乐：免费音乐模型都被地域封锁，改成浏览器本地作曲（Web Audio）+ WAV 导出。
+  // 提示词只用来生成随机种子：和弦走向、音色、鼓点都不一样。
+  async function runMusicGen(job, ctl) {
+    updateJob(job.id, { status: 'running', progress: '作曲中…' });
+    if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
+
+    var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!OAC) throw new Error('这个浏览器不支持本地音乐合成（需要 Web Audio）');
+
+    var plan = makeSongPlan(job.prompt);
+    var seconds = plan.bars * plan.barSec;
+    var sampleRate = 44100;
+    var ctx = new OAC(2, Math.ceil(seconds * sampleRate), sampleRate);
+    buildSong(ctx, plan);
+
+    updateJob(job.id, { progress: '混音中…' });
+    var buffer = await ctx.startRendering();
+    if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
+
+    updateJob(job.id, { progress: '导出中…' });
+    var blob = encodeWav(buffer);
+    var url = URL.createObjectURL(blob);
+    var secondsOut = Math.round(buffer.duration);
+    genMediaCache[job.id] = { url: url, mime: 'audio/wav', seconds: secondsOut };
+    updateJob(job.id, { status: 'done', progress: '', result: { mime: 'audio/wav', size: blob.size, seconds: secondsOut } });
+    return true;
+  }
+
+  function makeSongPlan(prompt) {
+    var seed = hashCode(prompt || 'gucang');
+    var rnd = rng(seed);
+    var major = rnd() > 0.32;
+    var root = 45 + Math.floor(rnd() * 12);       // 最低音 A2 起
+    var bpm = 84 + Math.floor(rnd() * 4) * 8;      // 84 / 92 / 100 / 108
+    var barSec = 4 * (60 / bpm);
+    var bars = 6;
+    var degrees = major
+      ? [[0, 4, 7], [9, 12, 16], [5, 9, 12], [7, 11, 14]]   // I - vi - IV - V
+      : [[0, 3, 7], [8, 12, 15], [5, 8, 10], [7, 10, 14]];  // i - VI - iv - v
+    return {
+      seed: seed, root: root, bpm: bpm, barSec: barSec, bars: bars,
+      major: major, degrees: degrees
+    };
+  }
+
+  function midiFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+
+  function buildSong(ctx, plan) {
+    var master = ctx.createGain();
+    master.gain.value = 1;
+    var lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 3400;
+    lp.connect(ctx.destination);
+    master.connect(lp);
+
+    var rnd = rng(plan.seed);
+    var barSec = plan.barSec;
+    var total = plan.bars * barSec;
+
+    // 1) 和弦垫：每小节一个和弦，三个音铺底
+    for (var b = 0; b < plan.bars; b++) {
+      var chord = plan.degrees[b % plan.degrees.length];
+      var t0 = b * barSec;
+      for (var k = 0; k < chord.length; k++) {
+        var osc = ctx.createOscillator();
+        osc.type = k === 0 ? 'triangle' : 'sine';
+        osc.frequency.value = midiFreq(plan.root + chord[k]);
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime(0.05, t0 + 0.35);
+        g.gain.setValueAtTime(0.05, Math.max(t0 + 0.35, t0 + barSec - 0.35));
+        g.gain.linearRampToValueAtTime(0, t0 + barSec);
+        osc.connect(g);
+        g.connect(master);
+        osc.start(t0);
+        osc.stop(t0 + barSec + 0.02);
+      }
+    }
+
+    // 2) 旋律：八分音符随机走音阶，留白
+    var scale = plan.major
+      ? [0, 2, 4, 7, 9, 11, 12, 14, 16, 19]
+      : [0, 2, 3, 7, 8, 10, 12, 14, 15, 19];
+    var step = barSec / 8;
+    var lastIdx = 3;
+    for (var n = 0; n < Math.floor(total / step); n++) {
+      var tn = n * step;
+      if (rnd() > 0.7) continue;                   // 留白，别太满
+      var idx = Math.max(0, Math.min(scale.length - 1, lastIdx + Math.floor(rnd() * 5) - 2));
+      lastIdx = idx;
+      var mo = ctx.createOscillator();
+      mo.type = rnd() > 0.5 ? 'sine' : 'triangle';
+      mo.frequency.value = midiFreq(plan.root + 12 + scale[idx]);
+      var mg = ctx.createGain();
+      mg.gain.setValueAtTime(0, tn);
+      mg.gain.linearRampToValueAtTime(0.085, tn + 0.02);
+      mg.gain.exponentialRampToValueAtTime(0.0008, tn + step * 0.92);
+      mo.connect(mg);
+      mg.connect(master);
+      mo.start(tn);
+      mo.stop(tn + step);
+    }
+
+    // 3) 鼓：每小节一个底鼓，八分音符轻踩镲
+    for (var b2 = 0; b2 < plan.bars; b2++) {
+      var tb = b2 * barSec;
+      kick(ctx, master, tb, 0.42);
+      for (var h = 1; h < 8; h += 2) hat(ctx, master, tb + h * step, 0.1);
+    }
+  }
+
+  function kick(ctx, dest, t, gain) {
+    var o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(48, t + 0.12);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    o.connect(g);
+    g.connect(dest);
+    o.start(t);
+    o.stop(t + 0.32);
+  }
+
+  function hat(ctx, dest, t, gain) {
+    var len = Math.floor(ctx.sampleRate * 0.09);
+    var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    var src = ctx.createBufferSource();
+    src.buffer = buf;
+    var hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 6000;
+    var g = ctx.createGain();
+    g.gain.value = gain;
+    src.connect(hp);
+    hp.connect(g);
+    g.connect(dest);
+    src.start(t);
+  }
+
+  // AudioBuffer -> PCM16 WAV
+  function encodeWav(buffer) {
+    var ch = buffer.numberOfChannels;
+    var len = buffer.length;
+    var rate = buffer.sampleRate;
+    var dataBytes = len * ch * 2;
+    var ab = new ArrayBuffer(44 + dataBytes);
+    var view = new DataView(ab);
+    function str(off, s) {
+      for (var i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i));
+    }
+    str(0, 'RIFF');
+    view.setUint32(4, 36 + dataBytes, true);
+    str(8, 'WAVE');
+    str(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, ch, true);
+    view.setUint32(24, rate, true);
+    view.setUint32(28, rate * ch * 2, true);
+    view.setUint16(32, ch * 2, true);
+    view.setUint16(34, 16, true);
+    str(36, 'data');
+    view.setUint32(40, dataBytes, true);
+    var chans = [];
+    for (var c = 0; c < ch; c++) chans.push(buffer.getChannelData(c));
+    var off = 44;
+    for (var i2 = 0; i2 < len; i2++) {
+      for (var c2 = 0; c2 < ch; c2++) {
+        var s = chans[c2][i2];
+        s = s < -1 ? -1 : (s > 1 ? 1 : s);
+        view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        off += 2;
+      }
+    }
+    return new Blob([ab], { type: 'audio/wav' });
+  }
+
+  // 图片：Pollinations 免费接口（免 Key），flux / turbo / sana 依次兜底
+  async function runImageGen(job, ctl) {
+    updateJob(job.id, { status: 'running', progress: '画图中…' });
+    var seed = hashCode(job.prompt);
+    var blob = await pollinationsImage(job.prompt, ctl, 1024, 1024, seed);
+    var url = URL.createObjectURL(blob);
+    var mime = blob.type || 'image/jpeg';
+    genMediaCache[job.id] = { url: url, mime: mime };
+    updateJob(job.id, { status: 'done', progress: '', result: { mime: mime, size: blob.size } });
+    return true;
+  }
 
   // 页面加载后，把还没结束的任务续跑起来
   function resumeJobs() {
