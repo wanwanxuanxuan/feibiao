@@ -46,10 +46,11 @@
 
   // 三个「生成类」AI：视频、音乐、图片。都是异步任务，要能在后台跑完。
   // 全部走免费方案：图片用 Pollinations（免 Key，几秒出图）；视频用关键帧 + 本地合成 WebM；
-  // 音乐用 ACE-Step（Hugging Face Space，免费、能按风格写歌并演唱歌词），不通时退回本地 Web Audio 合成。
+  // 音乐优先用阶跃 StepAudio 3 Music（限时免费，按风格 + 歌词真唱，需要在设置里填免费 Key），
+  // 没填 Key 时退回 ACE-Step（Hugging Face 免费 Space，GPU 配额有限），再不行用本地 Web Audio 合成。
   var GEN = {
     video: { name: '视频 AI', short: 'video', emoji: '🎬', engine: '本地合成 · 约 9 秒短片' },
-    music: { name: '音乐 AI', short: 'music', emoji: '🎵', engine: 'ACE-Step · 写词演唱' },
+    music: { name: '音乐 AI', short: 'music', emoji: '🎵', engine: 'StepAudio 3 · 写词演唱' },
     image: { name: '画图 AI', short: 'image', emoji: '🖼', engine: 'Pollinations · flux' }
   };
   var GEN_ALIASES = {
@@ -154,6 +155,7 @@
     var s = {
       key: DEFAULT_KEY,
       model: DEFAULT_MODEL,
+      stepfunKey: '',
       sound: true,
       showThinking: true,
       fx: true,
@@ -168,6 +170,7 @@
         if (j && typeof j === 'object') {
           if (j.key) s.key = j.key;
           if (j.model) s.model = j.model;
+          if (typeof j.stepfunKey === 'string') s.stepfunKey = j.stepfunKey;
           if (typeof j.sound === 'boolean') s.sound = j.sound;
           if (typeof j.showThinking === 'boolean') s.showThinking = j.showThinking;
           if (typeof j.fx === 'boolean') s.fx = j.fx;
@@ -275,14 +278,14 @@
       '- 用户上传任意文档后，客户端会先让 doc 读完，再把内容交给你。你可以据此继续解释、翻译、总结或改写。',
       '',
       '## 你的三个生成帮手（做视频 / 音乐 / 图片）',
-      '- 谷仓里还有三个负责「做东西」的 AI：视频 AI（做约 9 秒的短片，几张关键帧推拉镜头拼成）、音乐 AI（ACE-Step，按风格和人声要求写歌，能唱用户给的歌词，也能自动写词，通常 30 秒到 2 分钟）、画图 AI（用免费模型 flux 出 1024×1024 的图）。',
+      '- 谷仓里还有三个负责「做东西」的 AI：视频 AI（做约 9 秒的短片，几张关键帧推拉镜头拼成）、音乐 AI（StepAudio 3 Music，按你说的曲风、情绪、人声写歌，能把你给的歌词唱出来，没给歌词时它会自动写词；生成的时长由模型决定，通常 1 到 3 分钟）、画图 AI（用免费模型 flux 出 1024×1024 的图）。',
       '- 用户可以用 @video / @music / @image 直接点名让它们生成；这时你不用抢话，它们做完会回来找你总结。',
       '- 如果用户没有点名，但你判断他想要的是「生成一段视频 / 一首音乐 / 一张图片」，就在回复最后输出一行：',
       '  <route to="video" prompt="把用户想要的内容提炼成一句清晰的提示词"/>',
       '  （to 可选 video / music / image；prompt 里写生成提示词，不要写命令。）',
       '- 派单后，客户端会启动对应的生成 AI，生成完会自动把结果交给你，你再用一两句话回应。派单这一轮你照常回复用户就行，把 <route/> 放在最后。',
       '- 拿不准用户要哪种时，先简短问一句，不要乱派。用户只是想聊天、问问题、查资料时，不要派单。',
-      '- 视频大约 9 秒、图片一张、音乐 30 秒到 2 分钟。用户要「带歌词的歌」时，让他把歌词写进需求里（格式：风格要求 + 歌词：…），音乐 AI 会照着唱；没给歌词时它会自动写。别承诺一次生成多首。',
+      '- 视频大约 9 秒、图片一张、音乐通常 1 到 3 分钟。用户要「带歌词的歌」时，让他把歌词写进需求里（格式：曲风要求 + 歌词：…），音乐 AI 会照着唱；没给歌词时它会自动写。别承诺一次生成多首。',
       '',
       '## 回复要求',
       '1. 用中文回答，口语化，简洁但有信息量；可以少量用 emoji，不要每句都堆。',
@@ -390,7 +393,7 @@
     if (who === 'n30') return '看片 AI · n30';
     if (who === 'doc') return '读文档 AI · doc';
     if (who === 'video') return '视频 AI · 免费合成';
-    if (who === 'music') return '音乐 AI · ACE-Step';
+    if (who === 'music') return '音乐 AI · StepAudio 3';
     if (who === 'image') return '画图 AI · flux';
     return '小谷';
   }
@@ -1023,6 +1026,12 @@
         au.src = media.url;
         au.controls = true;
         player.appendChild(au);
+        if (media.engine) {
+          var eng = document.createElement('div');
+          eng.className = 'gen-engine';
+          eng.textContent = '🎧 引擎：' + media.engine;
+          player.appendChild(eng);
+        }
         if (media.transcript) {
           var tr = document.createElement('div');
           tr.className = 'gen-transcript';
@@ -2147,11 +2156,15 @@
     };
   }
 
-  // 音乐：走 ACE-Step（Hugging Face Space 上的免费 Gradio 接口）。
-  // 它能按风格提示词生成完整歌曲，也能把用户给的歌词唱出来；没给歌词就先让文字模型写。
-  // 接口不通时退回本地合成（Web Audio + WAV），至少不会空手而归。
+  // 音乐引擎优先级：
+  // 1) 阶跃 StepAudio 3 Music（限时免费，按曲风和歌词真唱）——设置里填了 StepFun Key 就用它；
+  // 2) ACE-Step（Hugging Face 免费 Space，免 Key，但免费 GPU 每天配额有限）；
+  // 3) 本地 Web Audio 合成兜底（没人声，只保证不会空手而归）。
   var ACE_BASE = 'https://ace-step-ace-step.hf.space';
   var ACE_DEFAULT_SECONDS = 60;
+  var STEP_API = 'https://api.stepfun.com/v1/audio/music';
+  var STEP_MODEL = 'stepaudio-3-music-preview';
+  // 输出时长由模型决定，这里只丢掉请求里的秒数
 
   // 解析需求：风格、歌词、时长。格式示例：「轻快的吉他曲，90 秒，歌词：……」
   function parseMusicRequest(text) {
@@ -2183,50 +2196,141 @@
     var req = parseMusicRequest(job.prompt);
     updateJob(job.id, { status: 'running', progress: 3, stage: '读需求' });
     var ticker = null;
+    var stepKey = (settings.stepfunKey || '').trim();
     try {
       var lyrics = req.lyrics;
-      if (!lyrics) {
-        if (req.instrumental) {
-          lyrics = '[verse]\n(humming softly)';
-        } else {
-          updateJob(job.id, { progress: 6, stage: '写歌词' });
-          lyrics = await writeLyricsByAI(req.style, ctl);
-        }
+      if (!lyrics && !req.instrumental && !stepKey) {
+        updateJob(job.id, { progress: 6, stage: '写歌词' });
+        lyrics = await writeLyricsByAI(req.style, ctl);
       }
+      if (!lyrics && req.instrumental) lyrics = '[verse]\n(humming softly)';
       if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
 
-      updateJob(job.id, { progress: 14, stage: '提交任务' });
-      ticker = startTicker(job.id, 45000, 86);
-      var mp3Url = await aceStepGenerate(req.style, lyrics, req.seconds, ctl, function (stage) {
-        updateJob(job.id, { stage: stage });
-      });
+      var out;
+      if (stepKey) {
+        // 主引擎：阶跃 StepAudio 3 Music，能按歌词演唱
+        updateJob(job.id, { progress: 12, stage: '提交 StepAudio' });
+        ticker = startTicker(job.id, 120000, 88);
+        out = await stepfunMusicGen(req, ctl, function (stage) {
+          updateJob(job.id, { stage: stage });
+        });
+        out.engine = '阶跃 StepAudio 3 Music';
+      } else {
+        // 免 Key 备用引擎：ACE-Step（StepAudio 没配 Key 时才用）
+        updateJob(job.id, { progress: 14, stage: '提交 ACE-Step' });
+        ticker = startTicker(job.id, 45000, 86);
+        var mp3Url = await aceStepGenerate(req.style, lyrics, req.seconds, ctl, function (stage) {
+          updateJob(job.id, { stage: stage });
+        });
+        out = { url: mp3Url, mime: 'audio/mpeg', lyrics: lyrics, engine: 'ACE-Step（免 Key）' };
+      }
       clearInterval(ticker);
 
       if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
-      // 直接播远程 mp3（省一次大文件下载，播放更快）；Space 休眠后链接会失效，但不影响本次会话
       updateJob(job.id, { progress: 96, stage: '整理' });
-      var url = mp3Url;
-      var mime = 'audio/mpeg';
-      genMediaCache[job.id] = { url: url, mime: mime, seconds: req.seconds, transcript: lyrics };
+      genMediaCache[job.id] = {
+        url: out.url,
+        mime: out.mime || 'audio/mpeg',
+        seconds: out.seconds || 0,
+        transcript: out.lyrics || '',
+        engine: out.engine || ''
+      };
       updateJob(job.id, {
         status: 'done', progress: 100, stage: '',
-        result: { mime: mime, seconds: req.seconds }
+        result: { mime: out.mime || 'audio/mpeg', seconds: out.seconds || 0 }
       });
       return true;
     } catch (e) {
       clearInterval(ticker);
       if (e && e.name === 'AbortError') throw e;
-      // 线上模型不通（Space 休眠 / 排队超时）：退回本地合成，并把原因留在卡片上
+      // 引擎都不可用：退回本地合成，并把原因留在卡片上
       updateJob(job.id, {
         progress: 30,
         stage: '线上模型不可用，改用本地合成',
-        note: '线上模型没接上（' + ((e && e.message) ? e.message : String(e)) + '），这次用本地合成兜底，没有演唱歌词。'
+        note: '线上模型没接上（' + ((e && e.message) ? e.message : String(e)) + '），这次用本地合成兜底，没有人声演唱。'
       });
       return await runLocalMusic(job, ctl);
     } finally {
       clearInterval(ticker);
     }
   }
+
+  // 阶跃 StepAudio 3 Music：提交任务 → 轮询 → 拿 Base64 音频
+  async function stepfunMusicGen(req, ctl, onStage) {
+    var key = (settings.stepfunKey || '').trim();
+    var body = {
+      task: 'text_to_music',
+      model_id: STEP_MODEL,
+      caption: req.style,
+      response_format: 'mp3'
+    };
+    if (req.instrumental) body.instrumental = true;
+    else if (req.lyrics) body.lyrics = req.lyrics;
+
+    var sub = await stepPost('/submit', body, key, ctl.signal);
+    var sj = await sub.json().catch(function () { return null; });
+    if (!sub.ok || !sj || !sj.task_id) throw new Error(stepErrText(sub.status, sj));
+
+    var taskId = sj.task_id;
+    var deadline = Date.now() + 330000;   // 一首歌几十秒到几分钟，最多等 5 分半
+    if (onStage) onStage('排队中');
+    while (Date.now() < deadline) {
+      await sleep(4000);
+      if (ctl.signal.aborted) throw new DOMException('aborted', 'AbortError');
+      if (onStage) onStage('演唱中');
+      var qr = await stepPost('/query', { task_id: taskId }, key, ctl.signal);
+      var q = await qr.json().catch(function () { return null; });
+      if (!qr.ok || !q) throw new Error(stepErrText(qr.status, q));
+      if (q.status === 'SUCCESS') {
+        if (!q.audio) throw new Error('音乐模型没有返回音频');
+        var blob = b64ToBlob(q.audio, 'audio/mpeg');
+        return {
+          url: URL.createObjectURL(blob),
+          mime: 'audio/mpeg',
+          lyrics: String(q.rewritten_lyrics || q.lyrics || req.lyrics || ''),
+          seconds: 0
+        };
+      }
+      if (q.status === 'FAILED') {
+        var m = q.error && q.error.message ? q.error.message : '生成失败';
+        if (q.error && q.error.stage === 'censor') m = '内容被安全审核拦截了，换个说法再试';
+        throw new Error(m);
+      }
+    }
+    throw new Error('音乐生成超时，稍后再试');
+  }
+
+  function stepPost(path, body, key, signal) {
+    return fetch(STEP_API + path, {
+      method: 'POST',
+      signal: signal,
+      headers: {
+        'Authorization': 'Bearer ' + key,
+        'Content-Type': 'application/json; charset=utf-8'
+      },
+      body: JSON.stringify(body)
+    });
+  }
+
+  function stepErrText(status, j) {
+    var t = j && j.error && j.error.type ? j.error.type : '';
+    if (status === 401 || t === 'invalid_api_key' || t === 'not_allowed') return 'StepFun Key 无效，请在设置里检查';
+    if (status === 402 || t === 'insufficient_credit') return 'StepFun 额度不足';
+    if (status === 429) return 'StepFun 请求太频繁，稍等再试';
+    if (status === 451 || t === 'censor') return '内容被安全审核拦截了，换个说法再试';
+    if (j && j.error && j.error.message) return String(j.error.message);
+    return 'StepFun 接口 HTTP ' + status;
+  }
+
+  // Base64（无 data: 前缀）→ Blob，大文件分块解码避免卡顿
+  function b64ToBlob(b64, mime) {
+    var bin = atob(b64);
+    var len = bin.length;
+    var bytes = new Uint8Array(len);
+    for (var i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: mime || 'audio/mpeg' });
+  }
+
 
   // 用户没写歌词时，先让文字模型按需求写一段
   async function writeLyricsByAI(style, ctl) {
@@ -3093,6 +3197,7 @@
     var sel = $('#setModel');
     sel.value = settings.model;
     if (!sel.value) sel.value = DEFAULT_MODEL;
+    if ($('#setStepKey')) $('#setStepKey').value = settings.stepfunKey || '';
     $('#setSound').checked = !!settings.sound;
     $('#setThink').checked = !!settings.showThinking;
     if ($('#setFx')) $('#setFx').checked = !!settings.fx;
@@ -3587,6 +3692,7 @@
       var model = $('#setModel').value;
       settings.key = key || DEFAULT_KEY;
       settings.model = model || DEFAULT_MODEL;
+      if ($('#setStepKey')) settings.stepfunKey = $('#setStepKey').value.trim();
       settings.sound = $('#setSound').checked;
       settings.showThinking = $('#setThink').checked;
       if ($('#setFx')) settings.fx = $('#setFx').checked;
@@ -3603,7 +3709,7 @@
       toast('设置已保存');
     });
     $('#resetSettings').addEventListener('click', function () {
-      settings = { key: DEFAULT_KEY, model: DEFAULT_MODEL, sound: true, showThinking: true, fx: true, speak: true, web: true, maxTokens: 3000 };
+      settings = { key: DEFAULT_KEY, model: DEFAULT_MODEL, stepfunKey: '', sound: true, showThinking: true, fx: true, speak: true, web: true, maxTokens: 3000 };
       saveSettings();
       IX.setSound(true);
       document.body.classList.remove('hide-thinking');
@@ -3616,6 +3722,13 @@
       i.type = i.type === 'password' ? 'text' : 'password';
       this.textContent = i.type === 'password' ? '显示' : '隐藏';
     });
+    if ($('#toggleStepKey')) {
+      $('#toggleStepKey').addEventListener('click', function () {
+        var i = $('#setStepKey');
+        i.type = i.type === 'password' ? 'text' : 'password';
+        this.textContent = i.type === 'password' ? '显示' : '隐藏';
+      });
+    }
 
     bindVoice();
 

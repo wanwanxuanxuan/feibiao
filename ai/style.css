@@ -678,6 +678,13 @@ body.hide-thinking .thinking { display: none !important; }
   max-height: 180px;
   overflow: auto;
 }
+
+.gen-engine {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--muted);
+  opacity: .85;
+}
 .gen-expired {
   font-size: 12.5px;
   color: var(--muted);
