@@ -621,7 +621,7 @@
     for (var i = 0; i < slides.length; i++) {
       var xml = await zip.file(slides[i].path).async('string');
       var body = '';
-      xml.replace(/<a:t>([\s\S]*?)<\/a:t>/g, function (m, s) { body += decodeEntities(s) + '\n'; return m; });
+      xml.replace(/<a:t[^>]*>([\s\S]*?)<\/a:t>/g, function (m, s) { body += decodeEntities(s) + '\n'; return m; });
       body = body.trim();
       if (!body) continue;
       out.push('【第 ' + slides[i].n + ' 页】\n' + body);
@@ -1607,12 +1607,10 @@
 
     var parts;
     if (media.kind === 'file') {
+      // 纯文本用字符串内容，兼容性最好
       var docHead = mediaPrompt(who, question, 'file');
-      parts = [{
-        type: 'text',
-        text: docHead + '\n\n## 文件：' + (media.name || '未命名') + (media.ext ? '（.' + media.ext + '）' : '') +
-          '\n```\n' + String(media.text || '').slice(0, 30000) + '\n```'
-      }];
+      parts = docHead + '\n\n## 文件：' + (media.name || '未命名') + (media.ext ? '（.' + media.ext + '）' : '') +
+        '\n```\n' + String(media.text || '').slice(0, 30000) + '\n```';
     } else {
       parts = [{ type: 'text', text: mediaPrompt(who, question, media.kind) }];
       (media.media || []).slice(0, 8).forEach(function (url) {
