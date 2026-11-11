@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark" data-wallpaper="tide">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#071326">
+  <title>Windows 13 · 黄蓝概念桌面</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="desktop.css">
+  <link rel="stylesheet" href="apps.css">
+</head>
+<body>
+  <div class="noise-layer" aria-hidden="true"></div>
+
+  <div class="boot-screen" id="boot-screen">
+    <div class="boot-halo"></div>
+    <div class="boot-content">
+      <div class="win-logo boot-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="boot-wordmark">Windows <span>13</span></div>
+      <div class="boot-spinner" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+      <p class="boot-caption">正在准备你的黄蓝桌面…</p>
+    </div>
+    <button class="boot-skip" id="boot-skip">点击跳过</button>
+    <div class="boot-version">Windows 13 Pro · Concept Build 26H2</div>
+  </div>
+
+  <main class="desktop" id="desktop">
+    <div class="wallpaper" id="wallpaper" aria-hidden="true">
+      <svg class="wallpaper-art" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <linearGradient id="skyGrad" x1="0" y1="0" x2="0.9" y2="1">
+            <stop offset="0" stop-color="var(--wp-sky1)"/>
+            <stop offset=".45" stop-color="var(--wp-sky2)"/>
+            <stop offset=".78" stop-color="var(--wp-sky3)"/>
+            <stop offset="1" stop-color="var(--wp-sky4)"/>
+          </linearGradient>
+          <radialGradient id="sunGlow">
+            <stop offset="0" stop-color="var(--wp-glow)" stop-opacity=".95"/>
+            <stop offset=".3" stop-color="var(--wp-glow)" stop-opacity=".55"/>
+            <stop offset=".66" stop-color="var(--wp-glow)" stop-opacity=".12"/>
+            <stop offset="1" stop-color="var(--wp-glow)" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="sunDisc" cx=".38" cy=".34" r=".72">
+            <stop offset="0" stop-color="var(--wp-sun-hi)"/>
+            <stop offset=".58" stop-color="var(--wp-sun)"/>
+            <stop offset="1" stop-color="var(--wp-sun-lo)"/>
+          </radialGradient>
+          <linearGradient id="waveA" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="var(--wp-wave1)"/>
+            <stop offset="1" stop-color="var(--wp-wave2)"/>
+          </linearGradient>
+          <linearGradient id="waveB" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="var(--wp-wave2)"/>
+            <stop offset="1" stop-color="var(--wp-wave3)"/>
+          </linearGradient>
+          <linearGradient id="goldRibbon" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="var(--wp-ribbon)" stop-opacity=".06"/>
+            <stop offset=".35" stop-color="var(--wp-ribbon)" stop-opacity=".8"/>
+            <stop offset=".7" stop-color="var(--wp-sun-hi)" stop-opacity=".34"/>
+            <stop offset="1" stop-color="var(--wp-ribbon)" stop-opacity=".04"/>
+          </linearGradient>
+          <linearGradient id="blueRibbon" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="var(--wp-blue-ribbon)" stop-opacity=".04"/>
+            <stop offset=".5" stop-color="var(--wp-blue-ribbon)" stop-opacity=".55"/>
+            <stop offset="1" stop-color="var(--wp-blue-ribbon)" stop-opacity=".02"/>
+          </linearGradient>
+          <filter id="softBlur" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="38"/>
+          </filter>
+          <filter id="wideBlur" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="90"/>
+          </filter>
+        </defs>
+
+        <rect width="1920" height="1080" fill="url(#skyGrad)"/>
+
+        <g class="wp-stars" fill="#ffe8a8">
+          <circle cx="230" cy="180" r="2" opacity=".55"/>
+          <circle cx="370" cy="285" r="1.3" opacity=".3"/>
+          <circle cx="620" cy="140" r="1.6" opacity=".4"/>
+          <circle cx="790" cy="330" r="1.2" opacity=".25"/>
+          <circle cx="980" cy="165" r="2.1" opacity=".45"/>
+          <circle cx="1180" cy="300" r="1.4" opacity=".28"/>
+          <circle cx="1320" cy="125" r="1.7" opacity=".4"/>
+          <circle cx="1520" cy="260" r="1.2" opacity=".22"/>
+          <circle cx="1720" cy="170" r="1.8" opacity=".34"/>
+          <circle cx="480" cy="430" r="1.2" opacity=".2"/>
+          <circle cx="1080" cy="470" r="1.5" opacity=".2"/>
+        </g>
+
+        <g class="wp-sun-group">
+          <circle cx="1480" cy="650" r="560" fill="url(#sunGlow)" filter="url(#wideBlur)" opacity=".9"/>
+          <circle cx="1480" cy="635" r="210" fill="url(#sunDisc)"/>
+          <circle cx="1480" cy="635" r="270" fill="var(--wp-glow)" opacity=".16" filter="url(#softBlur)"/>
+        </g>
+
+        <g class="wp-ribbons" fill="none" stroke-linecap="round">
+          <path class="wp-ribbon wp-ribbon-a" d="M-180,610 C280,380 610,830 980,650 C1320,485 1570,535 2110,310" stroke="url(#goldRibbon)" stroke-width="210" opacity=".22" filter="url(#softBlur)"/>
+          <path class="wp-ribbon wp-ribbon-b" d="M-120,780 C350,600 600,940 1020,760 C1380,605 1620,710 2070,500" stroke="url(#goldRibbon)" stroke-width="20" opacity=".72"/>
+          <path class="wp-ribbon wp-ribbon-c" d="M-100,500 C250,660 540,330 860,470 C1210,625 1560,250 2000,410" stroke="url(#blueRibbon)" stroke-width="135" opacity=".28" filter="url(#softBlur)"/>
+          <path class="wp-ribbon wp-ribbon-d" d="M-80,355 C310,520 520,235 820,360 C1140,495 1430,180 1990,300" stroke="url(#blueRibbon)" stroke-width="3" opacity=".48"/>
+        </g>
+
+        <g class="wp-water">
+          <path d="M0,758 C230,685 470,790 760,748 C1080,700 1260,548 1560,580 C1740,598 1850,662 1920,640 L1920,1080 L0,1080 Z" fill="url(#waveA)" opacity=".82"/>
+          <path d="M0,860 C310,790 560,900 890,850 C1210,802 1450,688 1920,742 L1920,1080 L0,1080 Z" fill="url(#waveB)" opacity=".9"/>
+          <path d="M0,960 C370,918 640,1005 1000,952 C1340,902 1640,944 1920,890 L1920,1080 L0,1080 Z" fill="var(--wp-wave3)" opacity=".95"/>
+          <path class="wp-shimmer" d="M1270,792 C1420,758 1570,760 1710,790" stroke="var(--wp-sun-hi)" stroke-width="3" opacity=".34" fill="none" stroke-linecap="round"/>
+          <path class="wp-shimmer" d="M1360,835 C1480,812 1600,810 1720,832" stroke="var(--wp-sun-hi)" stroke-width="2" opacity=".24" fill="none" stroke-linecap="round"/>
+          <path class="wp-shimmer" d="M1440,885 C1540,866 1650,866 1760,882" stroke="var(--wp-sun-hi)" stroke-width="2" opacity=".16" fill="none" stroke-linecap="round"/>
+        </g>
+
+        <g class="wp-horizon-dots" fill="var(--wp-sun-hi)">
+          <circle cx="1150" cy="726" r="2.2" opacity=".5"/>
+          <circle cx="1230" cy="700" r="1.4" opacity=".32"/>
+          <circle cx="1680" cy="730" r="1.8" opacity=".38"/>
+          <circle cx="1810" cy="688" r="1.2" opacity=".24"/>
+        </g>
+      </svg>
+      <div class="wallpaper-vignette"></div>
+    </div>
+
+    <div class="desktop-icons" id="desktop-icons" aria-label="桌面图标"></div>
+
+    <section class="start-menu" id="start-menu" aria-label="开始菜单" aria-hidden="true">
+      <div class="start-search-row">
+        <div class="start-search">
+          <span class="start-search-icon" data-start-search-icon></span>
+          <input id="start-search-input" type="text" placeholder="搜索应用、文件和设置" autocomplete="off" aria-label="搜索">
+          <kbd>Esc</kbd>
+        </div>
+        <button class="start-avatar" id="start-avatar" title="账户">黄</button>
+      </div>
+      <div class="start-scroll" id="start-dynamic"></div>
+      <footer class="start-footer">
+        <button class="start-user" id="start-user">
+          <span class="avatar-letter">黄</span>
+          <span><b>黄蓝少年</b><small>本地账户</small></span>
+        </button>
+        <button class="start-footer-icon" id="start-power" title="电源" aria-label="电源"></button>
+        <div class="power-menu" id="power-menu">
+          <button data-power-action="lock"><span data-power-icon="lock"></span>锁定</button>
+          <button data-power-action="sleep"><span data-power-icon="sleep"></span>睡眠</button>
+          <button data-power-action="restart"><span data-power-icon="restart"></span>重启</button>
+          <button data-power-action="shutdown"><span data-power-icon="power"></span>关机</button>
+        </div>
+      </footer>
+    </section>
+
+    <div class="flyout quick-settings" id="quick-settings" aria-label="快速设置" aria-hidden="true">
+      <div class="qs-head">
+        <div>
+          <strong>YellowBlue · 5G</strong>
+          <span><i class="status-dot"></i> 已连接，安全</span>
+        </div>
+        <button class="icon-button" data-open-settings="network" title="网络设置"></button>
+      </div>
+      <div class="qs-grid">
+        <button class="qs-tile" data-qs-toggle="wifi"><span class="qs-icon" data-icon-slot="wifi"></span><span><b>Wi-Fi</b><small>YellowBlue</small></span></button>
+        <button class="qs-tile" data-qs-toggle="bluetooth"><span class="qs-icon" data-icon-slot="bluetooth"></span><span><b>蓝牙</b><small>已开启</small></span></button>
+        <button class="qs-tile" data-qs-toggle="airplane"><span class="qs-icon" data-icon-slot="airplane"></span><span><b>飞行模式</b><small>已关闭</small></span></button>
+        <button class="qs-tile" data-qs-toggle="batterySaver"><span class="qs-icon" data-icon-slot="battery"></span><span><b>节能模式</b><small>平衡</small></span></button>
+        <button class="qs-tile" data-qs-toggle="nightLight"><span class="qs-icon" data-icon-slot="sun"></span><span><b>夜间模式</b><small>已关闭</small></span></button>
+        <button class="qs-tile" data-open-settings="accessibility"><span class="qs-icon" data-icon-slot="accessibility"></span><span><b>辅助功能</b><small>快速访问</small></span></button>
+      </div>
+      <div class="qs-slider">
+        <span data-icon-slot="brightness"></span>
+        <input type="range" id="brightness-slider" min="20" max="100" step="1" aria-label="亮度">
+        <span class="qs-value" id="brightness-value">100%</span>
+      </div>
+      <div class="qs-slider">
+        <span data-icon-slot="volume"></span>
+        <input type="range" id="volume-slider" min="0" max="100" step="1" aria-label="音量">
+        <span class="qs-value" id="volume-value">68%</span>
+      </div>
+      <div class="now-playing">
+        <div class="album-cover"><span></span></div>
+        <div class="track"><b>Solar Tide</b><small>Windows 13 · Ambient Sessions</small></div>
+        <button class="media-button" id="media-toggle" aria-label="播放或暂停"></button>
+        <button class="media-button" id="media-next" aria-label="下一首"></button>
+      </div>
+      <footer class="qs-footer">
+        <button class="qs-footer-button" data-open-settings="system"><span data-icon-slot="settings"></span>设置</button>
+        <button class="qs-footer-button" id="qs-lock"><span data-icon-slot="lock"></span>锁定</button>
+      </footer>
+    </div>
+
+    <div class="flyout notification-center" id="notification-center" aria-label="通知中心" aria-hidden="true">
+      <div class="notif-top">
+        <div class="notif-date">
+          <span id="notif-weekday">星期三</span>
+          <strong id="notif-day">11</strong>
+          <small id="notif-month">十一月 2026</small>
+        </div>
+        <button class="icon-button" id="clear-notifications" title="清除所有通知"></button>
+      </div>
+      <div class="calendar" id="calendar"></div>
+      <div class="notif-section-head">
+        <span>通知</span>
+        <button id="notif-count">3 条新通知</button>
+      </div>
+      <div class="notif-list" id="notif-list"></div>
+    </div>
+
+    <div class="window-layer" id="window-layer"></div>
+
+    <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+    <div class="context-menu" id="context-menu" role="menu" aria-hidden="true"></div>
+
+    <div class="taskbar" id="taskbar">
+      <div class="taskbar-left">
+        <button class="weather-pill" id="weather-pill" title="天气与资讯">
+          <span class="weather-sun" aria-hidden="true"></span>
+          <span class="weather-copy"><b>24°</b><small>晴 · 空气优</small></span>
+        </button>
+      </div>
+      <div class="taskbar-center">
+        <button class="start-button" id="start-button" title="开始" aria-label="开始">
+          <span class="win-logo"><i></i><i></i><i></i><i></i></span>
+        </button>
+        <button class="taskbar-search" id="taskbar-search" title="搜索">
+          <span data-icon-slot="search"></span><span class="taskbar-search-label">搜索</span>
+        </button>
+        <div class="taskbar-apps" id="taskbar-apps"></div>
+      </div>
+      <div class="taskbar-right">
+        <button class="tray-group" id="tray-quick" title="网络、声音和电池">
+          <span data-icon-slot="wifi" id="tray-wifi"></span>
+          <span data-icon-slot="volume" id="tray-volume"></span>
+          <span data-icon-slot="battery" id="tray-battery"></span>
+        </button>
+        <button class="taskbar-clock" id="taskbar-clock" title="通知和日历">
+          <span id="clock-time">21:40</span>
+          <span id="clock-date">2026/11/11</span>
+        </button>
+        <button class="show-desktop" id="show-desktop" title="显示桌面" aria-label="显示桌面"></button>
+      </div>
+    </div>
+  </main>
+
+  <div class="brightness-overlay" id="brightness-overlay" aria-hidden="true"></div>
+  <div class="night-light-overlay" id="night-light-overlay" aria-hidden="true"></div>
+
+  <section class="lock-screen" id="lock-screen" aria-label="锁屏" aria-hidden="true">
+    <div class="lock-glow"></div>
+    <div class="lock-time">
+      <div class="lock-clock" id="lock-clock">21:40</div>
+      <div class="lock-date" id="lock-date">11月11日，星期三</div>
+    </div>
+    <div class="lock-hint">
+      <div class="lock-avatar">黄</div>
+      <b>黄蓝少年</b>
+      <span>点击任意位置或按 Enter 继续</span>
+    </div>
+    <div class="lock-weather">
+      <span class="weather-sun small" aria-hidden="true"></span>
+      <div><b>24°C</b><span>晴朗 · 上海</span></div>
+    </div>
+  </section>
+
+  <section class="shutdown-screen" id="shutdown-screen" aria-hidden="true">
+    <div class="shutdown-content">
+      <div class="win-logo shutdown-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <h2 id="shutdown-title">正在关机</h2>
+      <p id="shutdown-message">请稍候，Windows 正在保存你的设置。</p>
+      <div class="boot-spinner" id="shutdown-spinner" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+      <button class="shutdown-power" id="shutdown-power" aria-label="重新开机" hidden>
+        <span data-icon-slot="power"></span>
+      </button>
+    </div>
+  </section>
+
+  <div class="window-drag-ghost" id="drag-ghost" aria-hidden="true"></div>
+
+  <script src="core.js"></script>
+  <script src="shell.js"></script>
+  <script src="windows.js"></script>
+  <script src="settings.js"></script>
+  <script src="explorer.js"></script>
+  <script src="browser.js"></script>
+  <script src="apps.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

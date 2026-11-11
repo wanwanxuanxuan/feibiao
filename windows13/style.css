@@ -1,0 +1,441 @@
+/* ============================================================
+   Windows 13 · Solar Tide
+   A yellow-blue concept desktop for the browser
+   ============================================================ */
+
+:root {
+  --taskbar-h: 52px;
+  --accent: #ffc83d;
+  --accent-rgb: 255, 200, 61;
+  --accent-ink: #20180a;
+  --accent-2: #4b83ff;
+  --accent-2-rgb: 75, 131, 255;
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", "Noto Sans SC", sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", "Bahnschrift", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  --radius-window: 13px;
+  --radius-card: 10px;
+  --ease: cubic-bezier(.2, .75, .25, 1);
+  --spring: cubic-bezier(.17, .84, .44, 1);
+  --wp-sky1: #041127;
+  --wp-sky2: #08346d;
+  --wp-sky3: #b66d1d;
+  --wp-sky4: #1b1936;
+  --wp-glow: #ffbc35;
+  --wp-sun: #ffd25b;
+  --wp-sun-hi: #fff3bf;
+  --wp-sun-lo: #ee8d16;
+  --wp-wave1: #0b2c5c;
+  --wp-wave2: #071b3c;
+  --wp-wave3: #030b1b;
+  --wp-ribbon: #ffdc78;
+  --wp-blue-ribbon: #76a7ff;
+}
+
+:root[data-wallpaper="lagoon"] {
+  --wp-sky1: #02191f;
+  --wp-sky2: #07596f;
+  --wp-sky3: #f1b52f;
+  --wp-sky4: #12364c;
+  --wp-glow: #ffe061;
+  --wp-sun: #ffe98f;
+  --wp-sun-hi: #fffbe0;
+  --wp-sun-lo: #f5a623;
+  --wp-wave1: #0b5063;
+  --wp-wave2: #073646;
+  --wp-wave3: #021a25;
+  --wp-ribbon: #ffe37a;
+  --wp-blue-ribbon: #73e2ff;
+}
+
+:root[data-wallpaper="amber"] {
+  --wp-sky1: #151027;
+  --wp-sky2: #43365f;
+  --wp-sky3: #e4a12a;
+  --wp-sky4: #9d4d1e;
+  --wp-glow: #ffc94a;
+  --wp-sun: #ffde83;
+  --wp-sun-hi: #fff5d1;
+  --wp-sun-lo: #e47c12;
+  --wp-wave1: #54331e;
+  --wp-wave2: #2b263c;
+  --wp-wave3: #11101f;
+  --wp-ribbon: #ffe59a;
+  --wp-blue-ribbon: #8db8ff;
+}
+
+:root[data-wallpaper="midnight"] {
+  --wp-sky1: #020611;
+  --wp-sky2: #0b1b3f;
+  --wp-sky3: #5d3b6d;
+  --wp-sky4: #09152c;
+  --wp-glow: #efbf49;
+  --wp-sun: #f7d56b;
+  --wp-sun-hi: #fff3c0;
+  --wp-sun-lo: #b87317;
+  --wp-wave1: #0a1d3d;
+  --wp-wave2: #061126;
+  --wp-wave3: #020712;
+  --wp-ribbon: #f8dc8a;
+  --wp-blue-ribbon: #6a8bff;
+}
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --text: #f5f2e8;
+  --text-2: #d8d8d2;
+  --muted: #9ba8be;
+  --muted-2: #7c8ba4;
+  --surface: rgba(10, 22, 42, .78);
+  --surface-2: rgba(22, 38, 63, .72);
+  --surface-3: rgba(32, 50, 77, .62);
+  --surface-solid: #0c1a2f;
+  --surface-solid-2: #12233c;
+  --surface-raised: rgba(22, 38, 63, .92);
+  --line: rgba(255, 255, 255, .105);
+  --line-strong: rgba(255, 255, 255, .18);
+  --hover: rgba(255, 255, 255, .075);
+  --hover-strong: rgba(255, 255, 255, .12);
+  --shadow-window: 0 30px 80px rgba(0, 4, 14, .6), 0 4px 18px rgba(0, 4, 14, .34);
+  --shadow-flyout: 0 28px 65px rgba(0, 4, 16, .55);
+  --taskbar-bg: rgba(8, 18, 35, .76);
+  --titlebar-bg: rgba(13, 27, 48, .78);
+  --accent-soft: rgba(var(--accent-rgb), .18);
+  --accent-hover: rgba(var(--accent-rgb), .28);
+  --blue-soft: rgba(var(--accent-2-rgb), .16);
+  --danger: #ff6b68;
+  --success: #61d8a0;
+  --scroll: rgba(255, 255, 255, .18);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --text: #132238;
+  --text-2: #273951;
+  --muted: #5e6f87;
+  --muted-2: #8090a5;
+  --surface: rgba(248, 249, 252, .82);
+  --surface-2: rgba(255, 255, 255, .72);
+  --surface-3: rgba(231, 238, 248, .76);
+  --surface-solid: #f5f7fb;
+  --surface-solid-2: #ffffff;
+  --surface-raised: rgba(255, 255, 255, .96);
+  --line: rgba(25, 50, 80, .11);
+  --line-strong: rgba(25, 50, 80, .18);
+  --hover: rgba(34, 70, 115, .07);
+  --hover-strong: rgba(34, 70, 115, .12);
+  --shadow-window: 0 30px 80px rgba(20, 40, 70, .28), 0 4px 18px rgba(20, 40, 70, .14);
+  --shadow-flyout: 0 28px 65px rgba(20, 40, 70, .26);
+  --taskbar-bg: rgba(244, 247, 251, .74);
+  --titlebar-bg: rgba(250, 251, 253, .8);
+  --accent-soft: rgba(var(--accent-rgb), .22);
+  --accent-hover: rgba(var(--accent-rgb), .34);
+  --blue-soft: rgba(var(--accent-2-rgb), .12);
+  --scroll: rgba(20, 40, 70, .2);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #030b18;
+  color: var(--text);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button, input, textarea, select { font: inherit; color: inherit; }
+button { border: 0; background: none; padding: 0; cursor: pointer; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+input, textarea, select { border: 0; outline: 0; }
+::selection { background: rgba(var(--accent-rgb), .38); color: var(--text); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scroll);
+  border: 3px solid transparent;
+  border-radius: 10px;
+  background-clip: padding-box;
+}
+
+.noise-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  pointer-events: none;
+  opacity: .035;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.9'/%3E%3C/svg%3E");
+}
+
+.icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon.fill { fill: currentColor; stroke: none; }
+
+/* ---------------- Boot ---------------- */
+
+.boot-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 68% 60%, rgba(255, 188, 53, .2), transparent 33%),
+    radial-gradient(circle at 20% 20%, #0a2a59 0, transparent 48%),
+    linear-gradient(145deg, #030816 0%, #07182f 55%, #0b1f3d 100%);
+  transition: opacity .7s var(--ease), visibility .7s;
+}
+.boot-screen.done { opacity: 0; visibility: hidden; }
+.boot-halo {
+  position: absolute;
+  width: 620px;
+  height: 620px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 202, 65, .2), transparent 68%);
+  filter: blur(20px);
+  animation: bootHalo 4s ease-in-out infinite alternate;
+}
+@keyframes bootHalo { to { transform: scale(1.16); opacity: .6; } }
+.boot-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateY(-2vh);
+}
+.win-logo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  width: 24px;
+  height: 24px;
+  transform: perspective(120px) rotateY(-8deg) rotateX(4deg);
+}
+.win-logo i {
+  display: block;
+  border-radius: 2px;
+  background: linear-gradient(145deg, #ffe89a, var(--accent) 45%, #e89a15);
+  box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .4);
+}
+.win-logo i:nth-child(2) { background: linear-gradient(145deg, #a9c5ff, #4f85ff 52%, #214ba8); }
+.win-logo i:nth-child(3) { background: linear-gradient(145deg, #ffd375, #e6a224 55%, #985b0c); }
+.win-logo i:nth-child(4) { background: linear-gradient(145deg, #8eb3ff, #3f73e8 50%, #173784); }
+.boot-logo {
+  width: 98px;
+  height: 98px;
+  gap: 9px;
+  margin-bottom: 28px;
+  filter: drop-shadow(0 20px 45px rgba(255, 188, 53, .25));
+}
+.boot-logo i { border-radius: 8px; }
+.boot-wordmark {
+  font-family: var(--font-display);
+  font-size: 42px;
+  font-weight: 300;
+  letter-spacing: -.04em;
+  color: #f8f6ef;
+}
+.boot-wordmark span { font-weight: 600; color: var(--accent); }
+.boot-spinner {
+  display: flex;
+  gap: 7px;
+  margin-top: 46px;
+  height: 18px;
+  align-items: center;
+}
+.boot-spinner span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff4cc;
+  animation: bootDot 1.25s infinite ease-in-out both;
+}
+.boot-spinner span:nth-child(2) { animation-delay: .12s; }
+.boot-spinner span:nth-child(3) { animation-delay: .24s; }
+.boot-spinner span:nth-child(4) { animation-delay: .36s; }
+.boot-spinner span:nth-child(5) { animation-delay: .48s; }
+@keyframes bootDot {
+  0%, 70%, 100% { transform: translateY(0); opacity: .28; }
+  35% { transform: translateY(-6px); opacity: 1; }
+}
+.boot-caption {
+  margin: 20px 0 0;
+  font-size: 12px;
+  letter-spacing: .08em;
+  color: rgba(240, 244, 255, .5);
+}
+.boot-skip {
+  position: absolute;
+  bottom: 94px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border-radius: 20px;
+  color: rgba(255, 255, 255, .5);
+  font-size: 11px;
+  letter-spacing: .06em;
+  transition: .2s;
+}
+.boot-skip:hover { background: rgba(255, 255, 255, .08); color: #fff; }
+.boot-version {
+  position: absolute;
+  bottom: 28px;
+  right: 34px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, .3);
+  letter-spacing: .08em;
+}
+
+/* ---------------- Desktop + wallpaper ---------------- */
+
+.desktop {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  user-select: none;
+}
+.wallpaper {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--wp-sky1);
+}
+.wallpaper-art {
+  width: 100%;
+  height: 100%;
+  display: block;
+  transform: scale(1.01);
+  transition: opacity .7s var(--ease), transform 1.4s var(--ease);
+}
+.wallpaper-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 72% 59%, transparent 16%, rgba(2, 6, 16, .18) 54%, rgba(1, 5, 13, .45) 100%),
+    linear-gradient(to bottom, rgba(1, 5, 12, .16), transparent 25%, transparent 74%, rgba(1, 5, 12, .18));
+}
+.wp-sun-group { transform-origin: 1480px 640px; animation: sunBreathe 9s ease-in-out infinite alternate; }
+@keyframes sunBreathe { to { transform: scale(1.025); opacity: .94; } }
+.wp-ribbon-b { animation: ribbonFloat 13s ease-in-out infinite alternate; }
+.wp-ribbon-d { animation: ribbonFloat 17s ease-in-out infinite alternate-reverse; }
+@keyframes ribbonFloat {
+  from { transform: translate3d(-6px, 2px, 0); }
+  to { transform: translate3d(10px, -6px, 0); }
+}
+.wp-shimmer { animation: shimmer 5.4s ease-in-out infinite alternate; }
+@keyframes shimmer { from { opacity: .1; } to { opacity: .48; } }
+
+/* ---------------- Desktop icons ---------------- */
+
+.desktop-icons {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  bottom: calc(var(--taskbar-h) + 10px);
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(6, 86px);
+  grid-auto-columns: 88px;
+  gap: 4px 6px;
+  align-content: start;
+  z-index: 2;
+}
+.desktop-icon {
+  width: 86px;
+  min-height: 82px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 3px 5px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #f9f7ef;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, .65);
+  transition: background .16s, border-color .16s;
+}
+.desktop-icon:hover { background: rgba(255, 255, 255, .09); border-color: rgba(255, 255, 255, .1); }
+.desktop-icon.selected { background: rgba(var(--accent-2-rgb), .24); border-color: rgba(255, 255, 255, .24); }
+.desktop-icon .desktop-icon-art {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  filter: drop-shadow(0 5px 10px rgba(0, 0, 0, .3));
+  transition: transform .18s var(--spring);
+}
+.desktop-icon:hover .desktop-icon-art { transform: translateY(-2px) scale(1.03); }
+.desktop-icon .desktop-icon-art .app-mark { width: 46px; height: 46px; border-radius: 11px; }
+.desktop-icon .desktop-icon-art > .icon { width: 42px; height: 42px; stroke-width: 1.35; color: #f8efce; }
+.desktop-icon span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 11.5px;
+  line-height: 1.3;
+  text-align: center;
+  word-break: break-all;
+  max-width: 82px;
+}
+
+/* App marks */
+.app-mark {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: #fff;
+  flex: none;
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .3), 0 2px 8px rgba(0, 0, 0, .12);
+}
+.app-mark .icon { width: 20px; height: 20px; }
+.app-mark.edge {
+  background:
+    radial-gradient(circle at 66% 32%, #ffd55b 0 22%, transparent 23%),
+    conic-gradient(from 210deg, #1f49d7, #4e9dff, #7ee7d5, #ffd65e, #1f49d7);
+}
+.app-mark.edge::after {
+  content: "";
+  position: absolute;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: rgba(6, 23, 53, .74);
+  filter: blur(.2px);
+}
+.app-mark.edge .icon { position: relative; z-index: 1; width: 18px; color: #fff; }
+.app-mark.explorer { background: linear-gradient(145deg, #ffe98e, #ffc33b 52%, #df9412); color: #372200; }
+.app-mark.settings { background: linear-gradient(145deg, #8bb9ff, #3a7bff 54%, #1f4cbe); color: #fff; }
+.app-mark.notepad { background: linear-gradient(150deg, #f2f8ff, #c8dcf3); color: #22527c; }
+.app-mark.photos { background: linear-gradient(145deg, #ffd55b, #f2872f 55%, #d54b5d); color: #fff; }
+.app-mark.calculator { background: linear-gradient(145deg, #2f4c75, #11213d); color: #ffe07a; }
+.app-mark.pc { background: linear-gradient(145deg, #90caff, #3277e8 60%, #1c4ba8); color: #fff; }
+.app-mark.recycle { background: linear-gradient(145deg, rgba(255,255,255,.2), rgba(140,170,215,.12)); color: #e5edff; border: 1px solid rgba(255,255,255,.18); }
+.app-mark.recycle .icon { width: 24px; height: 24px; }
+.app-mark.folder { background: linear-gradient(145deg, #ffe58a, #f5b82d 56%, #d68b0d); color: #4b3000; }
+.app-mark.terminal { background: linear-gradient(145deg, #253550, #0b1425 60%, #040912); color: #ffd76a; }
+.app-mark.mail { background: linear-gradient(145deg, #7bb8ff, #3273ec); color: #fff; }
+.app-mark.store { background: linear-gradient(145deg, #79d5ff, #286cff 60%, #1a3ea7); color: #fff; }
