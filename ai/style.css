@@ -347,6 +347,7 @@ body.hide-thinking .thinking { display: none !important; }
   border: none;
   border-radius: 10px;
   background: transparent;
+  text-decoration: none;
   color: var(--muted);
   font-size: 13.5px;
   font-weight: 600;

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>小谷改题 · 谷仓 AI</title>
+<meta name="description" content="小谷改题：上传题目和答案，AI 先认题、再对答案，最后批量批改照片并留痕。" />
+<meta name="theme-color" content="#08070f" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238b6cff'/%3E%3Cstop offset='1' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='26' fill='url(%23g)'/%3E%3Ctext x='50' y='68' font-size='48' text-anchor='middle' fill='%23fff' font-family='sans-serif' font-weight='bold'%3E改%3C/text%3E%3C/svg%3E" />
+<link rel="stylesheet" href="./gai.css?v=20261111a" />
+</head>
+<body>
+
+<header class="topbar">
+  <a class="back" href="../" title="回到小谷">← 小谷</a>
+  <div class="brand">
+    <div class="orb"><span>改</span></div>
+    <div class="brand-text">
+      <div class="brand-name">小谷改题</div>
+      <div class="brand-sub">先认题 · 再对答案 · 最后批改</div>
+    </div>
+  </div>
+  <button class="icon-btn" id="keyBtn" type="button" title="API Key / 模型设置">⚙</button>
+</header>
+
+<main class="wrap">
+
+  <nav class="steps" id="steps">
+    <button class="step active" type="button" data-step="1">
+      <span class="step-num">1</span>
+      <span class="step-txt"><b>题目</b><small>上传 / 拍照，AI 列题</small></span>
+    </button>
+    <button class="step" type="button" data-step="2">
+      <span class="step-num">2</span>
+      <span class="step-txt"><b>答案</b><small>上传或 AI 生成</small></span>
+    </button>
+    <button class="step" type="button" data-step="3">
+      <span class="step-num">3</span>
+      <span class="step-txt"><b>批改</b><small>多图按序批改留痕</small></span>
+    </button>
+  </nav>
+
+  <!-- ========== 第一步：题目 ========== -->
+  <section class="panel" id="step1">
+    <div class="panel-head">
+      <h1>第一步 · 把题目给我</h1>
+      <p>PDF / Word / PPT / 文本 / 图片都行，也可以直接拍试卷。我会先把题目一题一题列出来，印刷体和手写会分开标注。</p>
+    </div>
+
+    <div class="drop" id="qDrop" tabindex="0">
+      <div class="drop-ic">📄</div>
+      <div class="drop-title">把题目文件拖到这里</div>
+      <div class="drop-sub">或点下面按钮选择文件 / 拍一张</div>
+      <div class="drop-btns">
+        <button class="btn primary" type="button" id="pickQFile">选择文件</button>
+        <button class="btn" type="button" id="pickQCam">📷 拍照 / 图片</button>
+      </div>
+      <input type="file" id="qFile" accept=".pdf,.docx,.pptx,.txt,.md,.csv,.json,.html,.xml,.png,.jpg,.jpeg,.webp,.bmp,.gif" multiple hidden />
+      <input type="file" id="qCam" accept="image/*" capture="environment" hidden />
+      <p class="drop-tip">支持 PDF、Word(.docx)、PPT(.pptx)、纯文本和照片；扫描版 PDF 会自动按图片识别。</p>
+    </div>
+
+    <div class="bar" id="qBar" hidden>
+      <span class="bar-text" id="qBarText">识别中…</span>
+      <span class="spinner" id="qSpin"></span>
+      <button class="btn ghost sm" type="button" id="qAgain">重新识别</button>
+    </div>
+
+    <div class="list-head" id="qListHead" hidden>
+      <div>
+        <b>识别到的题目</b>
+        <small id="qCount">0 题</small>
+      </div>
+      <div class="list-tools">
+        <button class="btn ghost sm" type="button" id="qSelectAll">全选</button>
+        <button class="btn ghost sm" type="button" id="qSelectNone">全不选</button>
+        <button class="btn sm" type="button" id="qAdd">＋ 手动加一题</button>
+      </div>
+    </div>
+
+    <div class="q-list" id="qList"></div>
+
+    <div class="panel-foot">
+      <button class="btn ghost" type="button" id="qClear">清空题目</button>
+      <button class="btn primary" type="button" id="toStep2" disabled>下一步：答案 →</button>
+    </div>
+  </section>
+
+  <!-- ========== 第二步：答案 ========== -->
+  <section class="panel" id="step2" hidden>
+    <div class="panel-head">
+      <h1>第二步 · 答案从哪来</h1>
+      <p>可以上传答案（文件或拍照），也可以让 AI 先写一份参考答案。每道题的答案都能自己改。</p>
+    </div>
+
+    <div class="tabs" id="answerTabs">
+      <button class="tab active" type="button" data-tab="upload">上传答案</button>
+      <button class="tab" type="button" data-tab="ai">AI 生成答案</button>
+    </div>
+
+    <div class="tab-body" id="tabUpload">
+      <div class="drop slim" id="aDrop" tabindex="0">
+        <div class="drop-ic">📝</div>
+        <div class="drop-title">上传答案文件，或拍答案</div>
+        <div class="drop-btns">
+          <button class="btn primary" type="button" id="pickAFile">选择文件</button>
+          <button class="btn" type="button" id="pickACam">📷 拍照 / 图片</button>
+        </div>
+        <input type="file" id="aFile" accept=".pdf,.docx,.pptx,.txt,.md,.csv,.json,.html,.xml,.png,.jpg,.jpeg,.webp,.bmp,.gif" multiple hidden />
+        <input type="file" id="aCam" accept="image/*" capture="environment" hidden />
+      </div>
+      <div class="bar" id="aBar" hidden>
+        <span class="bar-text" id="aBarText">识别答案中…</span>
+        <span class="spinner"></span>
+      </div>
+    </div>
+
+    <div class="tab-body" id="tabAI" hidden>
+      <div class="ai-gen">
+        <div>
+          <b>让 AI 按题目写参考答案</b>
+          <p>会给每道选中的题写一份可以直接对照批改的答案；不会的题会写「（无法确定）」，你可以手动补。</p>
+        </div>
+        <button class="btn primary" type="button" id="aiGenBtn">✨ 生成答案</button>
+      </div>
+      <div class="bar" id="gBar" hidden>
+        <span class="bar-text" id="gBarText">AI 正在写答案…</span>
+        <span class="spinner"></span>
+      </div>
+    </div>
+
+    <div class="list-head" id="aListHead" hidden>
+      <div>
+        <b>对照答案</b>
+        <small id="aCount">0 题</small>
+      </div>
+      <div class="list-tools">
+        <span class="legend"><i class="dot ai"></i>AI 生成</span>
+        <span class="legend"><i class="dot up"></i>你上传</span>
+      </div>
+    </div>
+
+    <div class="a-list" id="aList"></div>
+
+    <div class="panel-foot">
+      <button class="btn ghost" type="button" id="toStep1">← 上一步</button>
+      <button class="btn primary" type="button" id="toStep3" disabled>下一步：批改 →</button>
+    </div>
+  </section>
+
+  <!-- ========== 第三步：批改 ========== -->
+  <section class="panel" id="step3" hidden>
+    <div class="panel-head">
+      <h1>第三步 · 上传答卷，按顺序批改</h1>
+      <p>一次可以传很多张，我会按你上传的顺序一张张改。每道题会标出对、错或部分对，想留痕就打勾打开「留痕批改」。</p>
+    </div>
+
+    <div class="drop slim" id="sDrop" tabindex="0">
+      <div class="drop-ic">🖼</div>
+      <div class="drop-title">上传学生答卷照片（可多选）</div>
+      <div class="drop-btns">
+        <button class="btn primary" type="button" id="pickSFiles">选择图片</button>
+        <button class="btn" type="button" id="pickSCam">📷 现场拍一张</button>
+      </div>
+      <input type="file" id="sFile" accept="image/*" multiple hidden />
+      <input type="file" id="sCam" accept="image/*" capture="environment" hidden />
+      <p class="drop-tip">顺序 = 批改顺序，可以点缩略图上的 × 删掉重传。</p>
+    </div>
+
+    <div class="sheets" id="sheets"></div>
+
+    <div class="grade-bar">
+      <label class="switch">
+        <input type="checkbox" id="annotToggle" />
+        <span>留痕批改（在图片上打 ✓ / ✗ 并写出分数）</span>
+      </label>
+      <div class="grade-actions">
+        <button class="btn primary" type="button" id="gradeBtn" disabled>开始批改</button>
+      </div>
+    </div>
+
+    <div class="bar" id="sBar" hidden>
+      <span class="bar-text" id="sBarText">准备批改…</span>
+      <span class="spinner"></span>
+      <button class="btn ghost sm" type="button" id="sStop">停止</button>
+    </div>
+
+    <div class="summary" id="summary" hidden>
+      <div class="summary-head">
+        <b>批改汇总</b>
+        <span id="summaryMeta"></span>
+      </div>
+      <div class="summary-body" id="summaryBody"></div>
+    </div>
+
+    <div class="results" id="results"></div>
+
+    <div class="panel-foot">
+      <button class="btn ghost" type="button" id="toStep2b">← 上一步</button>
+      <button class="btn ghost" type="button" id="resetAll">重新开始</button>
+    </div>
+  </section>
+
+</main>
+
+<!-- 设置 -->
+<div class="modal" id="setModal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2>识别与批改设置</h2>
+        <p>和「小谷」共用同一个 OpenRouter Key，在这里改了，两边都生效。</p>
+      </div>
+      <button class="modal-x" type="button" data-close aria-label="关闭">×</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label" for="setKey">API Key</label>
+      <div class="key-row">
+        <input id="setKey" type="password" spellcheck="false" placeholder="sk-or-v1-..." />
+        <button class="mini-btn" type="button" id="toggleKey">显示</button>
+      </div>
+      <p class="field-note">Key 只存在当前浏览器。留空则使用页面默认的免费 Key。</p>
+
+      <label class="field-label" for="setVision">识图 / 批改主模型</label>
+      <select id="setVision"></select>
+      <p class="field-note">主模型不行时会自动换备用模型（额度不足、限流、模型下线都会自动切）。</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" type="button" data-close>取消</button>
+      <button class="btn primary" type="button" id="saveSet">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
+<script src="./gai.js?v=20261111a" defer></script>
+</body>
+</html>
