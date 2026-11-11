@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>智学云 · AI 批改工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css?v=6">
+<link rel="stylesheet" href="./style.css?v=1">
+</head>
+<body>
+<div class="aipg-app">
+  <header class="aipg-top">
+    <div class="aipg-brand">
+      <span class="brand-dot">✎</span>
+      <div>
+        <div class="brand-title">AI 批改工具</div>
+        <div class="brand-sub" id="stepSub">识别题目 → 校对 → 答案 → 对应 → 批改</div>
+      </div>
+    </div>
+    <div class="aipg-stepchip" id="stepChip">第 1 步 / 共 5 步（1/5）</div>
+  </header>
+
+  <nav class="aipg-stepper" id="stepper" aria-label="步骤进度"></nav>
+
+  <main class="aipg-main" id="stepRoot"></main>
+
+  <footer class="aipg-foot">
+    <button class="btn btn-ghost" id="prevBtn" type="button">← 上一步</button>
+    <div class="aipg-foot-spacer"></div>
+    <button class="btn btn-primary" id="nextBtn" type="button">下一步 →</button>
+  </footer>
+</div>
+
+<div class="aipg-modal" id="modal" hidden>
+  <div class="aipg-modal-card" id="modalCard"></div>
+</div>
+
+<div class="cam-overlay" id="camOverlay" hidden>
+  <div class="cam-box">
+    <div class="cam-head">
+      <span id="camTitle">连续拍照</span>
+      <button class="cam-close" id="camClose" type="button">×</button>
+    </div>
+    <video id="camVideo" autoplay playsinline muted></video>
+    <canvas id="camCanvas" hidden></canvas>
+    <div class="cam-shots" id="camShots"></div>
+    <div class="cam-actions">
+      <button class="btn btn-ghost" id="camSwitch" type="button">切换摄像头</button>
+      <button class="btn btn-primary cam-shoot" id="camShoot" type="button">📷 拍摄</button>
+      <button class="btn btn-success" id="camDone" type="button">完成（已拍 <b id="camCount">0</b> 张）</button>
+    </div>
+    <p class="cam-tip">每拍一张立刻保存，可继续拍下一张，不退出界面。</p>
+  </div>
+</div>
+
+<div class="aipg-toasts" id="toasts"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script>if(window['pdfjsLib']){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';}</script>
+<script src="./app.js?v=1"></script>
+</body>
+</html>
