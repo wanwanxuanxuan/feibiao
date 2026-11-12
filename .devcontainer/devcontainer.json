@@ -1,0 +1,17 @@
+{
+  "name": "微语 AI 微信助手",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
+  "postCreateCommand": "python3 -m pip install --user -r wechat-ai/requirements.txt",
+  "postStartCommand": "cd wechat-ai; if [ -f /tmp/weixinchat.pid ]; then kill $(cat /tmp/weixinchat.pid) 2>/dev/null || true; fi; nohup python3 server.py >/tmp/weixinchat.log 2>&1 & echo $! >/tmp/weixinchat.pid; sleep 1; echo '微语已启动: http://localhost:8090'",
+  "forwardPorts": [8090],
+  "portsAttributes": {
+    "8090": {
+      "label": "微语 AI 微信助手",
+      "onAutoForward": "openBrowser",
+      "visibility": "public"
+    }
+  },
+  "hostRequirements": {
+    "cpus": 2
+  }
+}
