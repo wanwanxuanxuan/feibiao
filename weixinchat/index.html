@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>微语 · AI 微信助手</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.4 9 9 0 0 1-3.6-.7L4 21l1.4-4.3A8.3 8.3 0 0 1 4 11.5 8.4 8.4 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 20c0-3.1 2.5-5.4 5.5-5.4s5.5 2.3 5.5 5.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.9M17.5 14.9c2.1.5 3.5 2.3 3.5 5.1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.55 1.7 1.7 0 0 0-1.88.34l-.06.06A2 2 0 1 1 3.17 16.9l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H1.9a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.55-1.1 1.7 1.7 0 0 0-.34-1.88l-.06-.06A2 2 0 1 1 6.98 3.1l.06.06a1.7 1.7 0 0 0 1.87.34h.1a1.7 1.7 0 0 0 1-1.55V1.9a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.1a1.7 1.7 0 0 0 1.55 1h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.55 1Z" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M3.6 20.4 21 12 3.6 3.6l2.2 7.2L14 12l-8.2 1.2Z" fill="currentColor"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 2.5l1.7 5.1 5.1 1.7-5.1 1.7L12 16.1l-1.7-5.1L5.2 9.3l5.1-1.7Z" fill="currentColor"/><path d="M18.5 14.5l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9Z" fill="currentColor" opacity=".65"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 4.5 7.5 12 15 19.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m5 5 14 14M19 5 5 19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m4.5 12.5 5 5 10-11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M7 8h10v3a5 5 0 0 1-10 0Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 16v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v4.5h-4.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 6.5h16M9 3.5h6M6.5 6.5 7.4 20h9.2l.9-13.5M10 10v6.5M14 10v6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+</svg>
+
+<div class="app" id="app">
+
+  <aside class="rail">
+    <div class="brand"><span class="brand-cn">微</span><span class="brand-tag">AI</span></div>
+    <nav class="rail-nav">
+      <button class="rail-btn is-active" data-jump="chats" title="会话"><svg class="ico"><use href="#i-chat"/></svg><span>会话</span></button>
+      <button class="rail-btn" data-jump="contacts" title="通讯录"><svg class="ico"><use href="#i-users"/></svg><span>通讯录</span></button>
+      <button class="rail-btn" data-jump="settings" title="设置"><svg class="ico"><use href="#i-gear"/></svg><span>设置</span></button>
+    </nav>
+    <div class="rail-foot">
+      <button class="rail-avatar" id="railAvatar" title="账号">我</button>
+      <span class="conn-dot" id="railDot" data-status="connected"></span>
+    </div>
+  </aside>
+
+  <section class="list-col">
+    <header class="list-head">
+      <div class="list-title-row">
+        <h1 class="list-title">会话</h1>
+        <span class="list-count" id="listCount">0</span>
+        <button class="icon-btn" id="newSettingsBtn" title="设置"><svg class="ico"><use href="#i-gear"/></svg></button>
+      </div>
+      <label class="search">
+        <svg class="ico"><use href="#i-search"/></svg>
+        <input id="searchInput" type="search" placeholder="搜索联系人 / 群聊" autocomplete="off" />
+      </label>
+      <div class="chips" id="chips">
+        <button class="chip is-on" data-filter="all">全部</button>
+        <button class="chip" data-filter="unread">未读 <em id="unreadChip"></em></button>
+        <button class="chip" data-filter="ai">AI 接管</button>
+      </div>
+    </header>
+
+    <div class="contacts" id="contactList"></div>
+
+    <footer class="list-foot">
+      <div class="autoreply">
+        <div class="ar-text">
+          <b>AI 自动回复</b>
+          <small id="arHint">新消息将自动交给 AI 代回</small>
+        </div>
+        <button class="switch" id="globalAuto" role="switch" aria-checked="false"><i></i></button>
+      </div>
+      <div class="conn-row" id="connRow">
+        <span class="conn-dot" data-status="connected"></span>
+        <span id="connText">演示模式</span>
+        <button class="link-btn" id="connManage">管理</button>
+      </div>
+    </footer>
+  </section>
+
+  <main class="chat-col" id="chatCol">
+    <div class="empty" id="emptyState">
+      <div class="empty-mark">微</div>
+      <h2 class="empty-title">把对话交给 AI</h2>
+      <p class="empty-sub">从左侧选择一位联系人，查看聊天记录，<br>或让 AI 代你回复一句。</p>
+      <div class="empty-tip"><kbd>Enter</kbd> 发送 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 换行</div>
+    </div>
+
+    <section class="chat" id="chatView" hidden>
+      <header class="chat-head">
+        <button class="icon-btn mobile-back" id="backBtn" title="返回"><svg class="ico"><use href="#i-back"/></svg></button>
+        <div class="chat-who">
+          <h2 id="chatName">—</h2>
+          <div class="chat-meta">
+            <span id="chatSource">—</span>
+            <span class="sep">·</span>
+            <span id="chatStatus">在线</span>
+          </div>
+        </div>
+        <div class="chat-actions">
+          <button class="pill-btn" id="aiReplyBtn">
+            <svg class="ico"><use href="#i-spark"/></svg><span>让 AI 回复</span>
+          </button>
+          <label class="takeover" title="该联系人是否由 AI 接管">
+            <span>AI 接管</span>
+            <button class="switch switch-sm" id="contactAuto" role="switch" aria-checked="true"><i></i></button>
+          </label>
+          <button class="icon-btn" id="contactInfoBtn" title="会话设置"><svg class="ico"><use href="#i-gear"/></svg></button>
+        </div>
+      </header>
+
+      <div class="messages" id="messages"></div>
+
+      <div class="typing-row" id="typingRow" hidden>
+        <span class="typing-dots"><i></i><i></i><i></i></span>
+        <span id="typingText">AI 正在输入…</span>
+      </div>
+
+      <footer class="composer">
+        <div class="composer-top">
+          <span class="prefix-hint">AI 消息前缀 <code id="prefixChip">【AI回复】</code></span>
+          <button class="link-btn" id="simulateBtn">模拟收到消息</button>
+        </div>
+        <div class="composer-box">
+          <textarea id="composerInput" rows="1" placeholder="输入消息，Enter 发送…"></textarea>
+          <div class="composer-actions">
+            <button class="ghost-btn" id="aiDraftBtn" title="让 AI 写一条"><svg class="ico"><use href="#i-spark"/></svg>AI 代写</button>
+            <button class="send-btn" id="sendBtn" title="发送"><svg class="ico"><use href="#i-send"/></svg></button>
+          </div>
+        </div>
+      </footer>
+    </section>
+  </main>
+</div>
+
+<!-- ============ 首次接入向导 ============ -->
+<div class="modal wizard" id="wizard" hidden>
+  <div class="wizard-card">
+    <aside class="wizard-aside">
+      <div class="wz-brand">微 · AI</div>
+      <h2 class="wz-title">接入你的<br />微信会话</h2>
+      <p class="wz-sub">AI 读取会话、代你回复。<br />每条 AI 消息都带可自定义的前缀。</p>
+      <ol class="wz-steps" id="wzSteps">
+        <li data-step="1" class="is-active"><b>01</b><span>AI 引擎</span></li>
+        <li data-step="2"><b>02</b><span>微信接入</span></li>
+        <li data-step="3"><b>03</b><span>人设与前缀</span></li>
+      </ol>
+      <p class="wz-note">凭据只保存在你自己的服务器数据库中，不会上传到第三方。</p>
+    </aside>
+
+    <section class="wizard-main">
+      <div class="wz-pane is-on" data-pane="1">
+        <p class="wz-eyebrow">STEP 01 / 引擎</p>
+        <h3 class="wz-h">先接上一个 AI 模型</h3>
+        <p class="wz-p">支持任何 OpenAI 兼容接口：DeepSeek、通义千问、Kimi、OpenAI、自建 vLLM / Ollama 均可。</p>
+        <div class="form">
+          <label class="field">
+            <span>模型名称 <em>model</em></span>
+            <input id="wzModel" placeholder="deepseek-chat" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>API 地址 <em>base url</em></span>
+            <input id="wzBase" placeholder="https://api.deepseek.com/v1" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>API Key</span>
+            <input id="wzKey" type="password" placeholder="sk-..." autocomplete="off" />
+          </label>
+        </div>
+        <div class="test-row">
+          <button class="line-btn" id="wzTestBtn">测试连接</button>
+          <span class="test-result" id="wzTestResult"></span>
+        </div>
+      </div>
+
+      <div class="wz-pane" data-pane="2">
+        <p class="wz-eyebrow">STEP 02 / 通道</p>
+        <h3 class="wz-h">选择微信接入方式</h3>
+        <p class="wz-p">个人微信没有官方开放接口。这里提供三种真实可用的通道，请按你的情况选择。</p>
+
+        <div class="mode-tabs" id="modeTabs">
+          <button class="mode-tab" data-mode="wecom">
+            <b>企业微信</b><small>官方 API · 合规</small>
+          </button>
+          <button class="mode-tab" data-mode="gateway">
+            <b>本地网关</b><small>自建 · 扫码登录</small>
+          </button>
+          <button class="mode-tab is-on" data-mode="demo">
+            <b>演示模式</b><small>无需账号</small>
+          </button>
+        </div>
+
+        <div class="mode-pane" data-mode="wecom" hidden>
+          <div class="notice notice-warn">
+            <b>此版本为静态部署</b>
+            <p>GitHub Pages 上无法安全保存企业 Secret，也无法通过 IP 白名单访问官方接口。企业微信通道请在本机运行完整版；这里可使用「演示模式」或「本地网关」。</p>
+          </div>
+          <div class="notice">
+            <b>企业微信官方接口</b>
+            <p>通过「自建应用」收发消息、同步通讯录与外部联系人。需要企业管理员在后台创建应用并开启相应权限。</p>
+          </div>
+          <div class="form form-2">
+            <label class="field"><span>企业 ID <em>corp_id</em></span><input id="wzCorp" placeholder="ww1234567890abcdef" autocomplete="off" /></label>
+            <label class="field"><span>应用 AgentId</span><input id="wzAgent" placeholder="1000002" autocomplete="off" /></label>
+            <label class="field"><span>应用 Secret</span><input id="wzSecret" type="password" placeholder="应用管理页里的 Secret" autocomplete="off" /></label>
+            <label class="field"><span>客户联系 Secret <em>可选</em></span><input id="wzContactSecret" type="password" placeholder="用于同步微信客户" autocomplete="off" /></label>
+            <label class="field"><span>回调 Token</span><input id="wzToken" placeholder="接收消息的回调 Token" autocomplete="off" /></label>
+            <label class="field"><span>回调 AESKey</span><input id="wzAes" type="password" placeholder="43 位 EncodingAESKey" autocomplete="off" /></label>
+          </div>
+          <p class="hint">回调地址填：<code id="wzCallback"></code></p>
+        </div>
+
+        <div class="mode-pane" data-mode="gateway" hidden>
+          <div class="notice notice-warn">
+            <b>自建微信网关</b>
+            <p>个人微信需由你自己的网关（如 Wechaty 等）扫码登录后，以 HTTP 接口把消息转发给本站。本站不接触你的微信密码。</p>
+          </div>
+          <div class="form">
+            <label class="field"><span>网关地址</span><input id="wzGwBase" placeholder="http://127.0.0.1:8788" autocomplete="off" /></label>
+            <label class="field"><span>网关 Token</span><input id="wzGwToken" type="password" placeholder="可选，Bearer 校验" autocomplete="off" /></label>
+          </div>
+          <details class="proto">
+            <summary>网关接口约定（3 个接口）</summary>
+            <pre>GET  {base}/contacts
+  → {"contacts":[{"id":"wxid_xxx","name":"林晚"}]}
+
+GET  {base}/messages?since=1700000000000
+  → {"messages":[{"contact_id":"wxid_xxx","content":"在吗","created_at":1700000000000}]}
+
+POST {base}/messages/send
+  {"contact_id":"wxid_xxx","content":"【AI回复】在的"}</pre>
+            <p>也可以让网关主动推送：<code>POST /api/ingest</code>，Header 带 <code>X-Gateway-Token</code>。</p>
+          </details>
+        </div>
+
+        <div class="mode-pane" data-mode="demo" hidden>
+          <div class="notice">
+            <b>演示模式</b>
+            <p>无需任何微信账号，内置 8 位联系人与聊天记录，可完整体验「查看会话 → AI 代写 → 自动回复 → 自定义前缀」的流程。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="wz-pane" data-pane="3">
+        <p class="wz-eyebrow">STEP 03 / 人格</p>
+        <h3 class="wz-h">让 AI 说话像你</h3>
+        <p class="wz-p">设定语气与边界，并自定义 AI 消息前面的标记。</p>
+        <div class="form">
+          <label class="field">
+            <span>助手称呼</span>
+            <input id="wzName" placeholder="小助手" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>回复前缀 <em>可自定义</em></span>
+            <input id="wzPrefix" placeholder="【AI回复】" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>人设与规则</span>
+            <textarea id="wzPrompt" rows="5" placeholder="你是一个真诚、自然的微信聊天助手…"></textarea>
+          </label>
+          <label class="toggle-line">
+            <span><b>开启自动回复</b><small>收到新消息时，由 AI 直接代回（仍可对单个联系人关闭）</small></span>
+            <button class="switch" id="wzAuto" role="switch" aria-checked="false"><i></i></button>
+          </label>
+        </div>
+        <div class="prefix-preview">对方会看到：<code id="wzPrefixPreview">【AI回复】好的，我马上到。</code></div>
+      </div>
+
+      <footer class="wz-foot">
+        <button class="line-btn" id="wzBack" hidden>上一步</button>
+        <div class="wz-foot-right">
+          <button class="line-btn" id="wzSkip" hidden>跳过接入</button>
+          <button class="primary-btn" id="wzNext">下一步</button>
+        </div>
+      </footer>
+    </section>
+  </div>
+</div>
+
+<!-- ============ 设置抽屉 ============ -->
+<div class="drawer-mask" id="drawerMask" hidden></div>
+<aside class="drawer" id="drawer" hidden>
+  <header class="drawer-head">
+    <h2>设置</h2>
+    <button class="icon-btn" id="drawerClose"><svg class="ico"><use href="#i-close"/></svg></button>
+  </header>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
+
+<div class="toasts" id="toasts"></div>
+
+<script src="./local-api.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
