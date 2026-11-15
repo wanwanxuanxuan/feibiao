@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="灵屿 LingYu：为 Windows 打造的一块安静桌面领地。本地运行，不登录，不打扰。" />
+  <title>灵屿 LingYu — 把世界，收进一颗岛</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="cursor-glow" id="cursorGlow" aria-hidden="true"></div>
+  <canvas id="dust" aria-hidden="true"></canvas>
+
+  <nav class="nav" id="nav">
+    <a class="brand" href="#top" aria-label="灵屿首页">
+      <span class="brand-mark"><span></span></span>
+      <span class="brand-name">灵屿 <i>LingYu</i></span>
+    </a>
+    <div class="nav-links">
+      <a href="#about">关于</a>
+      <a href="#features">特性</a>
+      <a href="#hidden">隐藏模式</a>
+      <a href="#gallery">界面</a>
+      <a href="#shortcuts">快捷键</a>
+    </div>
+    <div class="nav-badge"><span class="dot"></span> 仅作介绍</div>
+  </nav>
+
+  <main>
+    <section class="hero" id="top">
+      <div class="hero-aurora" aria-hidden="true">
+        <span class="blob blob-a"></span>
+        <span class="blob blob-b"></span>
+        <span class="blob blob-c"></span>
+      </div>
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="line"></span> WINDOWS 灵动岛 · 本地优先</p>
+          <h1>把世界，<br /><em>收进一颗岛。</em></h1>
+          <p class="hero-lede">时间、天气、音乐、专注与系统控制，安静地停靠在屏幕顶端。需要时它就在那里，不需要时，它几乎不存在。</p>
+          <div class="hero-actions">
+            <a class="btn btn-dark" href="#features">探索灵屿 <span class="arrow">↗</span></a>
+            <span class="hero-note">不提供下载 · 只做介绍</span>
+          </div>
+          <div class="hero-stats">
+            <div><strong data-count="69">69</strong><span>项内置能力</span></div>
+            <div><strong data-count="2">2</strong><span>个独立界面</span></div>
+            <div><strong data-count="0">0</strong><span>账号与云端</span></div>
+          </div>
+        </div>
+
+        <div class="hero-stage" aria-label="灵屿展开态预览">
+          <div class="stage-ring ring-a"></div>
+          <div class="stage-ring ring-b"></div>
+          <div class="island-float">
+            <div class="island-glow"></div>
+            <img src="assets/island-expanded-clean.png" alt="灵屿灵动岛展开界面" class="hero-island" />
+          </div>
+          <div class="float-card card-clock">
+            <span class="card-dot"></span>
+            <div><b id="liveClock">22:18</b><small>本地时间 · 刚刚同步</small></div>
+          </div>
+          <div class="float-card card-hide">
+            <span class="tiny-key">TOP</span>
+            <div><b>向上，唤醒</b><small>完全隐藏模式</small></div>
+          </div>
+          <div class="float-card card-focus">
+            <span class="focus-orb"></span>
+            <div><b>专注 50 min</b><small>今天 · 已记录</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="scroll-hint"><span></span> 向下，慢慢看</div>
+    </section>
+
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee-track">
+        <span>本地运行</span><i>·</i><span>不登录</span><i>·</i><span>不打扰</span><i>·</i><span>69 项能力</span><i>·</i><span>一块安静的桌面领地</span><i>·</i>
+        <span>本地运行</span><i>·</i><span>不登录</span><i>·</i><span>不打扰</span><i>·</i><span>69 项能力</span><i>·</i><span>一块安静的桌面领地</span><i>·</i>
+      </div>
+    </div>
+
+    <section class="about section" id="about">
+      <div class="section-head reveal">
+        <p class="kicker">01 / 关于灵屿</p>
+        <h2>不是又一个悬浮窗，<br />是一块<em>安静的桌面领地</em>。</h2>
+      </div>
+      <div class="about-grid">
+        <div class="about-copy reveal">
+          <p>灵屿由两个独立界面组成：屏幕顶端的纯黑胶囊，和一间白绿浅色的设置房间。它们共享同一套本地数据，却彼此克制。</p>
+          <p>没有账号，没有云端，没有需要学习的复杂层级。你看到的就是全部，你调整的会立刻发生。</p>
+          <div class="about-points">
+            <div><span>01</span><b>一眼可见</b><small>时间、天气、电量与状态，在顶端安静排列。</small></div>
+            <div><span>02</span><b>触手可及</b><small>音乐、专注、剪贴板与系统操作，展开即用。</small></div>
+            <div><span>03</span><b>随时退场</b><small>悬停、点击或完全隐藏，把注意力还给你。</small></div>
+          </div>
+        </div>
+        <div class="about-visual reveal">
+          <div class="mini-desktop">
+            <div class="mini-top"><span></span><span></span><span></span></div>
+            <div class="mini-wallpaper">
+              <span class="mini-sun"></span>
+              <span class="mini-hill h1"></span>
+              <span class="mini-hill h2"></span>
+            </div>
+            <img src="assets/island-collapsed.png" alt="收起态灵屿" class="mini-island" />
+            <div class="mini-caption">收起时，只留一条安静的线。</div>
+          </div>
+          <div class="visual-note">DESIGNED TO DISAPPEAR</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="features section" id="features">
+      <div class="section-head reveal">
+        <p class="kicker">02 / 一块岛屿，很多件事</p>
+        <h2>不抢注意力，<br />但<em>什么都能做</em>。</h2>
+        <p class="section-lede">从早上第一眼时间，到深夜最后一首歌。功能很多，存在感很轻。</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card reveal tilt">
+          <div class="feature-icon"><span class="icon-sun"></span></div>
+          <p class="feature-no">A / 01</p>
+          <h3>时间与天气</h3>
+          <p>秒针、日期、农历与实时天气。不需要打开任何应用，抬眼就能读到今天。</p>
+          <div class="feature-tags"><span>实时</span><span>轻量</span></div>
+        </article>
+        <article class="feature-card reveal tilt">
+          <div class="feature-icon"><span class="icon-wave"></span></div>
+          <p class="feature-no">A / 02</p>
+          <h3>媒体与音量</h3>
+          <p>系统媒体信息、播放控制、专辑封面与音量亮度滑块，都在同一处。</p>
+          <div class="feature-tags"><span>系统媒体</span><span>即时</span></div>
+        </article>
+        <article class="feature-card reveal tilt">
+          <div class="feature-icon"><span class="icon-focus"></span></div>
+          <p class="feature-no">A / 03</p>
+          <h3>专注与呼吸</h3>
+          <p>番茄钟、倒计时、秒表、白噪音与呼吸引导。把节奏放慢一点。</p>
+          <div class="feature-tags"><span>50 min</span><span>离线</span></div>
+        </article>
+        <article class="feature-card reveal tilt">
+          <div class="feature-icon"><span class="icon-note"></span></div>
+          <p class="feature-no">A / 04</p>
+          <h3>随手记录</h3>
+          <p>快速笔记、待办、剪贴板历史与文件暂存架。灵感落下时，不用切换窗口。</p>
+          <div class="feature-tags"><span>自动保存</span><span>本地</span></div>
+        </article>
+        <article class="feature-card reveal tilt">
+          <div class="feature-icon"><span class="icon-grid"></span></div>
+          <p class="feature-no">A / 05</p>
+          <h3>系统与效率</h3>
+          <p>任务管理器、终端、资源管理器、截图、锁屏与蓝牙设备，原生能力一步直达。</p>
+          <div class="feature-tags"><span>Win32</span><span>原生</span></div>
+        </article>
+        <article class="feature-card reveal tilt">
+          <div class="feature-icon"><span class="icon-spark"></span></div>
+          <p class="feature-no">A / 06</p>
+          <h3>属于你的样子</h3>
+          <p>四种深色预置、六种强调色，缩放、透明度、圆角与动画速度都可以慢慢调。</p>
+          <div class="feature-tags"><span>可定制</span><span>实时</span></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="hidden-mode" id="hidden">
+      <div class="hidden-copy reveal">
+        <p class="kicker light">03 / 完全隐藏</p>
+        <h2>最好的界面，<br />是<em>你叫它时才出现</em>。</h2>
+        <p>开启「完全隐藏」后，灵动岛不会占住桌面上的任何一寸位置。把鼠标轻轻推到屏幕最上缘，它才回来；移开、点击别处，再安静退场。</p>
+        <div class="hidden-list">
+          <div><b>01</b><span>屏幕顶端唤醒</span></div>
+          <div><b>02</b><span>全局快捷键唤醒</span></div>
+          <div><b>03</b><span>托盘菜单随时召回</span></div>
+        </div>
+        <p class="tiny-note">它没有消失，只是在等你。</p>
+      </div>
+
+      <div class="edge-demo reveal" id="edgeDemo" aria-label="完全隐藏模式演示">
+        <div class="edge-wake" id="edgeWake">
+          <span class="edge-label">将鼠标移到这里 ↑</span>
+        </div>
+        <div class="edge-sky">
+          <span class="sky-glow"></span>
+          <span class="sky-orbit o1"></span>
+          <span class="sky-orbit o2"></span>
+          <div class="demo-island" id="demoIsland">
+            <div class="demo-head">
+              <div><strong>22:18</strong><small>11 月 14 日 · 星期六</small></div>
+              <span class="demo-weather">8° <i>晴</i></span>
+            </div>
+            <div class="demo-body">
+              <div class="demo-media"><span class="record"></span><div><b>暂无媒体播放</b><small>在任意播放器中开始播放</small></div></div>
+              <div class="demo-stats"><div><small>处理器</small><b>0%</b></div><div><small>内存</small><b>61%</b></div><div><small>专注</small><b>50m</b></div></div>
+            </div>
+          </div>
+          <div class="demo-cursor"><span></span></div>
+        </div>
+        <p class="demo-hint">移动鼠标至上边缘，试一次。</p>
+      </div>
+    </section>
+
+    <section class="quick-moments section">
+      <div class="section-head reveal">
+        <p class="kicker">04 / 三个瞬间</p>
+        <h2>它懂得<em>何时出现，<br />也懂得何时离开</em>。</h2>
+      </div>
+      <div class="moments">
+        <div class="moment reveal">
+          <span class="moment-index">01</span>
+          <h3>悬停，展开</h3>
+          <p>鼠标移入，胶囊舒展开来。不用点击，不用找图标。离开后按你设定的秒数自动收回。</p>
+          <div class="moment-line"></div>
+        </div>
+        <div class="moment reveal">
+          <span class="moment-index">02</span>
+          <h3>点外，收起</h3>
+          <p>展开时点击屏幕上的其他地方，它会立刻让路。刚刚展开的面板不会在桌面上逗留。</p>
+          <div class="moment-line"></div>
+        </div>
+        <div class="moment reveal">
+          <span class="moment-index">03</span>
+          <h3>隐藏，不见</h3>
+          <p>启用完全隐藏。桌面干净得像它从未出现过，直到你把鼠标推向上方。</p>
+          <div class="moment-line"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="gallery section" id="gallery">
+      <div class="section-head reveal">
+        <p class="kicker">05 / 界面一瞥</p>
+        <h2>黑色克制，<br /><em>白绿轻盈</em>。</h2>
+        <p class="section-lede">灵动岛是深夜的墨，设置是清晨的纸。两种气质，同一套逻辑。</p>
+      </div>
+      <div class="gallery-grid">
+        <figure class="shot shot-large reveal">
+          <img src="assets/settings-appearance.png" alt="灵屿设置 · 外观页" />
+          <figcaption><span>设置 · 外观</span><small>预置主题、强调色与实时预览</small></figcaption>
+        </figure>
+        <figure class="shot reveal">
+          <img src="assets/settings-island-new.png" alt="灵屿设置 · 灵动岛页" />
+          <figcaption><span>设置 · 灵动岛</span><small>完全隐藏、点击外部收起</small></figcaption>
+        </figure>
+        <figure class="shot reveal">
+          <img src="assets/settings-shortcuts-new.png" alt="灵屿设置 · 快捷键页" />
+          <figcaption><span>设置 · 快捷键</span><small>每一组都可以修改</small></figcaption>
+        </figure>
+        <figure class="shot shot-wide reveal">
+          <img src="assets/settings-features-new.png" alt="灵屿设置 · 功能清单" />
+          <figcaption><span>设置 · 功能</span><small>69 项能力，一眼看清</small></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="shortcuts section" id="shortcuts">
+      <div class="shortcut-copy reveal">
+        <p class="kicker">06 / 键盘是第二条捷径</p>
+        <h2>你习惯的，<br />才是<em>真的快捷</em>。</h2>
+        <p>六组全局快捷键全部可以重新录制。按下新的组合键，冲突会诚实显示，不合适的随时换掉。</p>
+        <div class="shortcut-hint"><span class="pulse-dot"></span> 设置 → 快捷键 → 修改</div>
+      </div>
+      <div class="keyboard reveal" aria-label="快捷键示意">
+        <div class="key-row">
+          <kbd>Ctrl</kbd><span>+</span><kbd>Alt</kbd><span>+</span><kbd class="wide">Space</kbd>
+          <em>展开 / 收起</em>
+        </div>
+        <div class="key-row">
+          <kbd>Ctrl</kbd><span>+</span><kbd>Alt</kbd><span>+</span><kbd>S</kbd>
+          <em>截图</em>
+        </div>
+        <div class="key-row">
+          <kbd>Ctrl</kbd><span>+</span><kbd>Alt</kbd><span>+</span><kbd>M</kbd>
+          <em>播放 / 暂停</em>
+        </div>
+        <div class="key-row">
+          <kbd>Ctrl</kbd><span>+</span><kbd>Alt</kbd><span>+</span><kbd>L</kbd>
+          <em>点击穿透</em>
+        </div>
+      </div>
+    </section>
+
+    <section class="quiet">
+      <div class="quiet-inner reveal">
+        <p class="kicker">07 / 一点坚持</p>
+        <blockquote>“把一件事做好，<br />胜过把十件事做响。”</blockquote>
+        <p class="quiet-copy">灵屿没有账户系统，不上传剪贴板，不读取你的聊天。所有设置、笔记、待办与链接都留在这台电脑里。它不试图成为你的第二大脑，只想成为桌面上一个顺手的角落。</p>
+        <div class="quiet-rule"></div>
+        <div class="quiet-meta"><span>本地优先</span><span>离线可用</span><span>无追踪</span><span>无下载</span></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-brand">
+      <span class="brand-mark small"><span></span></span>
+      <div><b>灵屿 LingYu</b><small>Windows 灵动岛 · 设计介绍页</small></div>
+    </div>
+    <p>官网仅作产品介绍，不提供下载。界面与功能以实际版本为准。</p>
+    <span class="footer-year">© 2026</span>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
