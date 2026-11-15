@@ -10,6 +10,108 @@
   const toggleEl = document.getElementById('toggle');
   const replayEl = document.getElementById('replay');
   const ticksEl = document.getElementById('ticks');
+  const cursorEl = document.getElementById('flyCursor');
+
+  /* 光标巡游脚本：鼠标滑到哪，哪一块开始演示 */
+  const ROUTINES = [
+    [
+      { at: 900, pos: '.island-mini', hit: ['.island-mini'] },
+      { at: 3400, pos: '.intro-wrap h1 em', hit: ['.intro-wrap h1 em'] },
+      { at: 5600, pos: '.intro-foot' }
+    ],
+    [
+      { at: 700, pos: '.island-media', hit: ['.island', '.island-media'] },
+      { at: 3500, pos: '.island-stats', hit: ['.island-stats'] },
+      { at: 6200, pos: '.island-head', hit: ['.island-head'] },
+      { at: 8400, pos: '.chips', hit: ['.chips'] }
+    ],
+    [0, 1, 2, 3, 4, 5].map((i) => ({
+      at: 500 + i * 1250,
+      pos: `.ability:nth-child(${i + 1})`,
+      hit: [`.ability:nth-child(${i + 1})`]
+    })),
+    [
+      { at: 700, pos: '.ring', hit: ['.ring'] },
+      { at: 5200, pos: '.focus-tags span:nth-child(1)', hit: ['.focus-tags span:nth-child(1)'] },
+      { at: 6400, pos: '.focus-tags span:nth-child(2)', hit: ['.focus-tags span:nth-child(2)'] },
+      { at: 7600, pos: '.focus-tags span:nth-child(3)', hit: ['.focus-tags span:nth-child(3)'] }
+    ],
+    [
+      { at: 700, pos: '.desk-edge', hit: ['.desk-edge'], add: [['.desk-island', 'wake']] },
+      { at: 4300, pos: '.desk-island', hit: ['.desk-island'], add: [['.desk-island', 'off']] },
+      { at: 7800, pos: '.desk-hint', hit: ['.desk-hint'] }
+    ],
+    [
+      { at: 600, pos: '.s-island', hit: ['.s-island'] },
+      { at: 2400, pos: '.swatches', hit: ['.swatches'] },
+      { at: 4400, pos: '.s-slider', hit: ['.s-slider'] }
+    ],
+    [{ at: 600, pos: '.outro-mark', hit: ['.outro-mark'] }]
+  ];
+
+  let routineTimers = [];
+
+  const jumpCursor = (x, y) => {
+    cursorEl.style.transition = 'none';
+    cursorEl.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    void cursorEl.offsetWidth;
+    cursorEl.style.transition = '';
+  };
+
+  const glideCursor = (el) => {
+    const r = el.getBoundingClientRect();
+    const x = Math.min(Math.max(r.left + r.width / 2, 12), innerWidth - 12);
+    const y = Math.min(Math.max(r.top + r.height / 2, 12), innerHeight - 12);
+    cursorEl.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  };
+
+  const clickCursor = () => {
+    cursorEl.classList.remove('tap');
+    void cursorEl.offsetWidth;
+    cursorEl.classList.add('tap');
+    routineTimers.push(setTimeout(() => cursorEl.classList.remove('tap'), 620));
+  };
+
+  const runRoutine = (index) => {
+    routineTimers.forEach(clearTimeout);
+    routineTimers = [];
+    cursorEl.classList.remove('tap');
+    document.querySelectorAll('.hit').forEach((el) => el.classList.remove('hit'));
+    document.querySelectorAll('.wake, .off').forEach((el) => el.classList.remove('wake', 'off'));
+
+    const steps = ROUTINES[index] || [];
+    if (!steps.length) return;
+
+    cursorEl.classList.add('ready');
+    jumpCursor(innerWidth * 0.16, innerHeight * 0.82);
+
+    steps.forEach((step) => {
+      routineTimers.push(setTimeout(() => {
+        const target = document.querySelector(step.pos);
+        if (target) glideCursor(target);
+      }, Math.max(0, step.at - 780)));
+
+      routineTimers.push(setTimeout(() => {
+        (step.hit || []).forEach((sel) => {
+          const target = document.querySelector(sel);
+          if (!target) return;
+          target.classList.remove('hit');
+          void target.offsetWidth;
+          target.classList.add('hit');
+        });
+        (step.add || []).forEach(([sel, cls]) => {
+          const target = document.querySelector(sel);
+          if (!target) return;
+          if (cls === 'off') target.classList.remove('wake');
+          target.classList.remove(cls);
+          void target.offsetWidth;
+          target.classList.add(cls);
+        });
+        clickCursor();
+      }, step.at));
+    });
+  };
+
 
   let time = 0;
   let current = -1;
@@ -37,6 +139,7 @@
     scenes.forEach((scene, i) => scene.classList.toggle('active', i === index));
     chapterEls.forEach((btn, i) => btn.classList.toggle('on', i === index));
     current = index;
+    runRoutine(index);
   };
 
   const restartScene = (index) => {
