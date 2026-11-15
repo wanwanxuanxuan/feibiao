@@ -6,7 +6,7 @@
 
 const OPENROUTER_KEY = atob('c2stb3ItdjEtYTY1MmQyZTlkZmM5Zjc3ZjI4MmNlMzU3N2IwZDllYzE1Yzk5MzhmMGFmMzc3MDM3YWI2OWIzYmU5MDQ4YWQwYQ==');
 const VISION_MODEL = 'nvidia/nemotron-3.5-super-vl:free';
-const VISION_FALLBACKS = ['nvidia/nemotron-nano-12b-v2-vl:free', 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free'];
+const VISION_FALLBACKS = ['google/gemma-4-31b-it:free', 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free'];
 const TEXT_MODEL = 'nvidia/nemotron-3-ultra-550b-a55b:free';
 const TEXT_FALLBACKS = ['nvidia/nemotron-3.5-lightning:free', 'nvidia/nemotron-3.5-super-vl:free'];
 const STORE_KEY = 'aipg_state_v1';
@@ -54,7 +54,10 @@ async function openrouter(messages, {model=VISION_MODEL, fallbacks=[], maxTokens
       });
       if(!res.ok){ let d=''; try{ d=(await res.json()).error?.message||''; }catch(e){} throw new Error('HTTP '+res.status+(d?': '+d:'')); }
       const j = await res.json();
-      const txt = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+      const msg = (j.choices && j.choices[0] && j.choices[0].message) || {};
+      // 推理类模型有时把内容放进 reasoning 字段、content 为 null
+      const txt = msg.content || msg.reasoning || '';
+      if(!txt) throw new Error('模型返回空内容');
       return txt;
     }catch(e){
       lastErr = e;
