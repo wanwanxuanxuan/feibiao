@@ -20,13 +20,13 @@
       { at: 5600, pos: '.intro-foot' }
     ],
     [
-      { at: 700, pos: '.island-media', hit: ['.island', '.island-media'] },
-      { at: 3500, pos: '.island-stats', hit: ['.island-stats'] },
+      { at: 1400, pos: '.island-media', hit: ['.island', '.island-media'] },
+      { at: 3600, pos: '.island-stats', hit: ['.island-stats'] },
       { at: 6200, pos: '.island-head', hit: ['.island-head'] },
       { at: 8400, pos: '.chips', hit: ['.chips'] }
     ],
     [0, 1, 2, 3, 4, 5].map((i) => ({
-      at: 500 + i * 1250,
+      at: 1400 + i * 1200,
       pos: `.ability:nth-child(${i + 1})`,
       hit: [`.ability:nth-child(${i + 1})`]
     })),
@@ -46,7 +46,7 @@
       { at: 2400, pos: '.swatches', hit: ['.swatches'] },
       { at: 4400, pos: '.s-slider', hit: ['.s-slider'] }
     ],
-    [{ at: 600, pos: '.outro-mark', hit: ['.outro-mark'] }]
+    [{ at: 1200, pos: '.outro-mark', hit: ['.outro-mark'] }]
   ];
 
   let routineTimers = [];
